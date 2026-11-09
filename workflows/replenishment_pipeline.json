@@ -1,0 +1,65 @@
+{
+  "name": "NexusTwin - Scheduled Replenishment Poller",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "name": "Cron Poller (15 min)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.AGENT_BRIDGE_URL || 'http://localhost:8080' }}/api/v1/twin/state",
+        "options": {}
+      },
+      "name": "Fetch Digital Twin State",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const state = $input.first().json;\nconst lowStockAlerts = [];\nfor (const [store, skus] of Object.entries(state.inventory || {})) {\n  for (const [sku, details] of Object.entries(skus)) {\n    if (details.on_hand <= (details.safety_buffer || 200)) {\n      lowStockAlerts.push({ store, sku, on_hand: details.on_hand });\n    }\n  }\n}\nreturn lowStockAlerts.map(alert => ({ json: alert }));"
+      },
+      "name": "Detect At-Risk Shelves",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 300]
+    }
+  ],
+  "connections": {
+    "Cron Poller (15 min)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Digital Twin State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Digital Twin State": {
+      "main": [
+        [
+          {
+            "node": "Detect At-Risk Shelves",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

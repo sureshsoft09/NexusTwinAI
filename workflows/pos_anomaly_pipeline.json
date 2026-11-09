@@ -1,0 +1,103 @@
+{
+  "name": "NexusTwin - POS Anomaly Ingestion Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pos-anomaly-webhook",
+        "options": {}
+      },
+      "name": "POS Scanner Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const event = $input.first().json;\nconst ratio = event.observed_velocity / Math.max(event.baseline_velocity, 1);\nconst isSpike = ratio >= 1.5;\nreturn [{ json: { ...event, spike_ratio: ratio, is_anomaly: isSpike } }];"
+      },
+      "name": "Anomaly Velocity Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.is_anomaly }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Filter Critical Anomalies",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AGENT_BRIDGE_URL || 'http://localhost:8080' }}/api/v1/signals/ingest",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-API-Key",
+              "value": "nexus-twin-secret-key-2026"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "name": "Dispatch to ADK Agent Bridge",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [950, 200]
+    }
+  ],
+  "connections": {
+    "POS Scanner Webhook": {
+      "main": [
+        [
+          {
+            "node": "Anomaly Velocity Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anomaly Velocity Gate": {
+      "main": [
+        [
+          {
+            "node": "Filter Critical Anomalies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Critical Anomalies": {
+      "main": [
+        [
+          {
+            "node": "Dispatch to ADK Agent Bridge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,53 @@
+# ==============================================================================
+# NexusTwin AI (Prototype/src) — Git Ignore Rules
+# ==============================================================================
+
+# 1. Environment Variable Files (Keep only .env.example templates)
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+
+# 2. Deployment Scripts Containing Environment Variables / Resource IDs
+deploy.py
+**/deploy.py
+deploy_*.py
+**/deploy_*.py
+deploy.ps1
+**/deploy.ps1
+deploy_*.ps1
+**/deploy_*.ps1
+run_backend.ps1
+**/run_backend.ps1
+
+# 3. Python Virtual Environments & Bytecode
+.venv/
+venv/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+**/*.egg-info/
+dist/
+**/dist/
+build/
+**/build/
+*.whl
+
+# 4. Node.js & Frontend Build
+node_modules/
+**/node_modules/
+frontend/dist/
+.vite/
+**/.vite/
+
+# 5. Logs, Local Session DBs & Credentials
+.adk/
+**/.adk/
+*.db
+*.sqlite3
+*.log
+*credentials*.json
+*service-account*.json
