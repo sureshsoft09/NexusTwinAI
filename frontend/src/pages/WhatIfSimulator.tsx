@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sliders, Play, RotateCcw, CheckCircle, ShieldAlert } from 'lucide-react';
+import { Sliders, Play, RotateCcw, CheckCircle2, ShieldAlert } from 'lucide-react';
 
 export const WhatIfSimulator: React.FC = () => {
   const [demandSurgePct, setDemandSurgePct] = useState<number>(380);
@@ -9,7 +9,6 @@ export const WhatIfSimulator: React.FC = () => {
   const [evaluating, setEvaluating] = useState<boolean>(false);
   const [liveGateResult, setLiveGateResult] = useState<any>(null);
 
-  // Dynamic calculations
   const baselineRate = 48.0;
   const currentVelocity = Math.round(baselineRate * (1 + demandSurgePct / 100));
   const storeStock = 180;
@@ -79,47 +78,51 @@ export const WhatIfSimulator: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col p-6 space-y-6 overflow-y-auto">
-      <div className="flex items-center justify-between">
+      <div className="bg-white border border-[#E6E0D3] rounded-2xl p-5 shadow-enterprise flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-white">What-If Scenario Simulator</h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Simulate volatile demand spikes, carrier spot rate fluctuations, and DC inventory constraints against the live 4-Rule Feasibility Gate API.
+          <h1 className="font-serif text-lg font-bold text-[#1C1917]">
+            What-If Supply Chain Scenario Planner
+          </h1>
+          <p className="text-xs text-[#78716C] mt-1">
+            Drag the sliders below to test how different customer demand spikes and trucking rates impact profit and the $1,000 Auto-Approval Policy.
           </p>
         </div>
         <div className="flex items-center space-x-2">
           <button
             onClick={runLiveBackendGateEvaluation}
             disabled={evaluating}
-            className="flex items-center space-x-1.5 text-xs text-slate-950 font-bold bg-teal-500 hover:bg-teal-400 px-3 py-1.5 rounded-lg transition cursor-pointer"
+            className="flex items-center space-x-1.5 text-xs text-white font-bold bg-[#2D6A4F] hover:bg-[#1E4D38] px-3.5 py-2 rounded-xl transition cursor-pointer shadow-xs"
           >
             <Play className="h-3.5 w-3.5" />
-            <span>{evaluating ? 'Evaluating...' : 'Evaluate on Backend Gate API'}</span>
+            <span>{evaluating ? 'Testing Policy...' : 'Test Against Live 4-Rule Policy'}</span>
           </button>
           <button
             onClick={handleReset}
-            className="flex items-center space-x-1.5 text-xs text-slate-400 hover:text-slate-200 bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-700 transition cursor-pointer"
+            className="flex items-center space-x-1.5 text-xs text-[#1C1917] hover:bg-[#F3EFE6] bg-[#FAF7F2] px-3.5 py-2 rounded-xl border border-[#E6E0D3] font-semibold transition cursor-pointer"
           >
-            <RotateCcw className="h-3.5 w-3.5" />
-            <span>Reset Defaults</span>
+            <RotateCcw className="h-3.5 w-3.5 text-[#2D6A4F]" />
+            <span>Reset Sliders</span>
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Controls Column */}
-        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 space-y-5">
-          <div className="flex items-center space-x-2 border-b border-slate-800 pb-3">
-            <Sliders className="h-4 w-4 text-teal-400" />
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-300">
-              Scenario Control Parameters
+        <div className="bg-white border border-[#E6E0D3] rounded-2xl p-6 shadow-enterprise space-y-6">
+          <div className="flex items-center space-x-2 border-b border-[#E6E0D3] pb-3">
+            <Sliders className="h-4 w-4 text-[#2D6A4F]" />
+            <h2 className="font-serif text-sm font-bold text-[#1C1917]">
+              Adjust Store &amp; Shipping Conditions
             </h2>
           </div>
 
           {/* Slider 1: Demand Surge % */}
           <div className="space-y-2">
             <div className="flex justify-between text-xs">
-              <span className="text-slate-400">POS Demand Surge Ratio</span>
-              <span className="font-mono text-red-400 font-bold">+{demandSurgePct}% ({currentVelocity} units/hr)</span>
+              <span className="font-semibold text-[#1C1917]">1. Customer Checkout Demand Spike</span>
+              <span className="font-mono text-[#B54834] font-bold">
+                +{demandSurgePct}% ({currentVelocity} packs/hr)
+              </span>
             </div>
             <input
               type="range"
@@ -128,16 +131,17 @@ export const WhatIfSimulator: React.FC = () => {
               step="10"
               value={demandSurgePct}
               onChange={(e) => setDemandSurgePct(Number(e.target.value))}
-              className="w-full accent-teal-400 cursor-pointer"
+              className="w-full accent-[#2D6A4F] cursor-pointer"
             />
           </div>
 
           {/* Slider 2: Expedited Freight Cost */}
           <div className="space-y-2">
             <div className="flex justify-between text-xs">
-              <span className="text-slate-400">Carrier Freight Cost Quote</span>
-              <span className={`font-mono font-bold ${freightCost > 1000 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                ${freightCost.toLocaleString()} {freightCost > 1000 ? '(Requires Director Approval)' : '(Auto-Approved)'}
+              <span className="font-semibold text-[#1C1917]">2. Trucking Carrier Shipping Cost</span>
+              <span className={`font-mono font-bold ${freightCost > 1000 ? 'text-[#B7791F]' : 'text-[#2D6A4F]'}`}>
+                ${freightCost.toLocaleString()}{' '}
+                {freightCost > 1000 ? '(Over $1,000 -> Needs Manager Sign-Off)' : '(Under $1,000 -> Auto-Approved)'}
               </span>
             </div>
             <input
@@ -147,15 +151,15 @@ export const WhatIfSimulator: React.FC = () => {
               step="50"
               value={freightCost}
               onChange={(e) => setFreightCost(Number(e.target.value))}
-              className="w-full accent-teal-400 cursor-pointer"
+              className="w-full accent-[#2D6A4F] cursor-pointer"
             />
           </div>
 
           {/* Slider 3: Austin DC Available Stock */}
           <div className="space-y-2">
             <div className="flex justify-between text-xs">
-              <span className="text-slate-400">Austin Central DC Inventory</span>
-              <span className="font-mono text-teal-300 font-bold">{austinStock.toLocaleString()} units</span>
+              <span className="font-semibold text-[#1C1917]">3. Austin Regional Warehouse Stock</span>
+              <span className="font-mono text-[#2D6A4F] font-bold">{austinStock.toLocaleString()} packs</span>
             </div>
             <input
               type="range"
@@ -164,15 +168,15 @@ export const WhatIfSimulator: React.FC = () => {
               step="100"
               value={austinStock}
               onChange={(e) => setAustinStock(Number(e.target.value))}
-              className="w-full accent-teal-400 cursor-pointer"
+              className="w-full accent-[#2D6A4F] cursor-pointer"
             />
           </div>
 
           {/* Slider 4: Heatwave Duration */}
           <div className="space-y-2">
             <div className="flex justify-between text-xs">
-              <span className="text-slate-400">Heatwave Forecast Duration</span>
-              <span className="font-mono text-orange-400 font-bold">{heatwaveDurationDays} Days</span>
+              <span className="font-semibold text-[#1C1917]">4. Heatwave Duration</span>
+              <span className="font-mono text-[#B7791F] font-bold">{heatwaveDurationDays} Days</span>
             </div>
             <input
               type="range"
@@ -181,65 +185,65 @@ export const WhatIfSimulator: React.FC = () => {
               step="1"
               value={heatwaveDurationDays}
               onChange={(e) => setHeatwaveDurationDays(Number(e.target.value))}
-              className="w-full accent-teal-400 cursor-pointer"
+              className="w-full accent-[#2D6A4F] cursor-pointer"
             />
           </div>
         </div>
 
         {/* Live Simulation Outcomes */}
-        <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 space-y-4 flex flex-col justify-between">
+        <div className="bg-white border border-[#E6E0D3] rounded-2xl p-6 shadow-enterprise space-y-4 flex flex-col justify-between">
           <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-300">
-                Simulated Feasibility Gate Projection
+            <div className="flex items-center justify-between border-b border-[#E6E0D3] pb-3">
+              <h2 className="font-serif text-sm font-bold text-[#1C1917]">
+                Simulated Decision &amp; Profit Outcome
               </h2>
               <span
-                className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                className={`text-[11px] font-bold px-3 py-0.5 rounded-full border ${
                   requiresHumanApproval
-                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-                    : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                    ? 'bg-[#FEF9EE] text-[#925E14] border-[#F9DFAA]'
+                    : 'bg-[#F2F8F4] text-[#1E4D38] border-[#C3DFCD]'
                 }`}
               >
-                {liveGateResult ? liveGateResult.gate_status : requiresHumanApproval ? 'REFERRED_TO_HUMAN' : 'AUTONOMOUS_APPROVED'}
+                {requiresHumanApproval ? 'PAUSED FOR MANAGER APPROVAL' : 'AUTOMATICALLY APPROVED'}
               </span>
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
-                <span className="text-slate-400 text-[11px]">Store Stockout Runway</span>
-                <p className="text-lg font-bold text-amber-400 mt-1">{runwayHours} Hours</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">Based on {currentVelocity} u/h burn rate</p>
+              <div className="bg-[#FAF7F2] p-4 rounded-xl border border-[#E6E0D3]">
+                <span className="text-[#78716C] text-[11px] font-medium">Time Until Shelf Is Empty</span>
+                <p className="font-serif text-xl font-bold text-[#B54834] mt-1">{runwayHours} Hours</p>
+                <p className="text-[11px] text-[#78716C] mt-0.5">At {currentVelocity} packs/hr buying speed</p>
               </div>
 
-              <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
-                <span className="text-slate-400 text-[11px]">Recommended Rebalance</span>
-                <p className="text-lg font-bold text-teal-300 mt-1">{unitsNeeded.toLocaleString()} units</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">From Austin Central DC</p>
+              <div className="bg-[#FAF7F2] p-4 rounded-xl border border-[#E6E0D3]">
+                <span className="text-[#78716C] text-[11px] font-medium">Recommended Restock Shipment</span>
+                <p className="font-serif text-xl font-bold text-[#2D6A4F] mt-1">{unitsNeeded.toLocaleString()} packs</p>
+                <p className="text-[11px] text-[#78716C] mt-0.5">From Austin Regional Warehouse</p>
               </div>
 
-              <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
-                <span className="text-slate-400 text-[11px]">Protected Gross Margin</span>
-                <p className="text-lg font-bold text-emerald-400 mt-1">${protectedMargin.toLocaleString()}</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">@ $6.20/unit gross margin</p>
+              <div className="bg-[#FAF7F2] p-4 rounded-xl border border-[#E6E0D3]">
+                <span className="text-[#78716C] text-[11px] font-medium">Store Profit Protected</span>
+                <p className="font-serif text-xl font-bold text-[#2D6A4F] mt-1">${protectedMargin.toLocaleString()}</p>
+                <p className="text-[11px] text-[#78716C] mt-0.5">@ $6.20 profit per pack</p>
               </div>
 
-              <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
-                <span className="text-slate-400 text-[11px]">Net Supply Chain ROI</span>
-                <p className="text-lg font-bold text-white mt-1">+${netValue.toLocaleString()}</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">After subtracting ${freightCost} freight</p>
+              <div className="bg-[#FAF7F2] p-4 rounded-xl border border-[#E6E0D3]">
+                <span className="text-[#78716C] text-[11px] font-medium">Net Profit After Shipping</span>
+                <p className="font-serif text-xl font-bold text-[#1C1917] mt-1">+${netValue.toLocaleString()}</p>
+                <p className="text-[11px] text-[#78716C] mt-0.5">After subtracting ${freightCost} shipping</p>
               </div>
             </div>
 
             {liveGateResult?.rules_evaluated && (
-              <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-1.5 text-xs">
-                <span className="text-[10px] uppercase tracking-wider text-teal-400 font-semibold block">
-                  Live Backend Gate Rules Evaluated (`/api/v1/governance/gate/evaluate`):
+              <div className="bg-[#F2F8F4] p-3.5 rounded-xl border border-[#C3DFCD] space-y-1.5 text-xs">
+                <span className="text-[11px] font-bold text-[#1E4D38] block">
+                  Live 4-Rule Policy Check Results:
                 </span>
                 {liveGateResult.rules_evaluated.map((r: any, idx: number) => (
-                  <div key={idx} className="flex items-center justify-between text-[11px] font-mono">
-                    <span className="text-slate-300">{r.rule_name}</span>
-                    <span className={r.passed ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold'}>
-                      {r.passed ? 'PASS' : 'HITL / FAIL'}
+                  <div key={idx} className="flex items-center justify-between text-[11px] font-medium">
+                    <span className="text-[#44403C]">{r.rule_name}</span>
+                    <span className={r.passed ? 'text-[#2D6A4F] font-bold' : 'text-[#B7791F] font-bold'}>
+                      {r.passed ? '✅ PASSED' : '⚠️ NEEDS MANAGER SIGN-OFF'}
                     </span>
                   </div>
                 ))}
@@ -247,20 +251,28 @@ export const WhatIfSimulator: React.FC = () => {
             )}
 
             <div
-              className={`p-3 rounded-lg border text-xs space-y-1 ${
+              className={`p-4 rounded-xl border text-xs space-y-1 ${
                 requiresHumanApproval
-                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-200'
-                  : 'bg-teal-500/10 border-teal-500/30 text-teal-200'
+                  ? 'bg-[#FEF9EE] border-[#F9DFAA] text-[#925E14]'
+                  : 'bg-[#F2F8F4] border-[#C3DFCD] text-[#1E4D38]'
               }`}
             >
-              <div className="flex items-center space-x-1.5 font-semibold">
-                {requiresHumanApproval ? <ShieldAlert className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
-                <span>{requiresHumanApproval ? 'Autonomy Gate Triggered:' : 'Policy Verified:'}</span>
+              <div className="flex items-center space-x-1.5 font-bold">
+                {requiresHumanApproval ? (
+                  <ShieldAlert className="h-4 w-4 text-[#B7791F]" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4 text-[#2D6A4F]" />
+                )}
+                <span>
+                  {requiresHumanApproval
+                    ? 'Why This Order Requires Manager Approval:'
+                    : 'Why This Order Ships Automatically:'}
+                </span>
               </div>
-              <p className="text-slate-300">
+              <p className="text-[#44403C] leading-relaxed">
                 {requiresHumanApproval
-                  ? `Freight cost of $${freightCost.toLocaleString()} exceeds the $1,000 threshold. Order will be referred to Tab 5 (Approvals Queue).`
-                  : `Freight cost of $${freightCost.toLocaleString()} is within policy. Order executes autonomously without manual delay.`}
+                  ? `Shipping cost of $${freightCost.toLocaleString()} is above the $1,000 automatic spending limit. The order is paused and sent to Tab 5 (Manager Sign-Off Queue).`
+                  : `Shipping cost of $${freightCost.toLocaleString()} is under the $1,000 automatic limit. The truck is dispatched immediately without waiting for manual paperwork.`}
               </p>
             </div>
           </div>

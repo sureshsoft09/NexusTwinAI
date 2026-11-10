@@ -87,12 +87,82 @@ class ReplenishmentProposal(BaseModel):
     selected_logistics: Optional[LogisticsOption] = None
 
 
+class SensingAgentCommonOutput(BaseModel):
+    """Standardized output contract from Market Sensing Agent (`sensing_agent`)."""
+    agent_name: str = "sensing_agent"
+    signal_source: str
+    store_id: str
+    sku_id: str
+    observed_velocity_hr: float
+    baseline_velocity_hr: float
+    velocity_spike_ratio: float
+    current_shelf_stock: int
+    safety_buffer: int
+    stockout_runway_hours: float
+    anomaly_detected: bool = True
+    mcp_tools_called: List[str] = Field(default_factory=list)
+    activities_performed: List[str] = Field(default_factory=list)
+    finding_summary: str
+
+
+class ReplenishmentAgentCommonOutput(BaseModel):
+    """Standardized output contract from Stock & Replenishment Agent (`replenishment_agent`)."""
+    agent_name: str = "replenishment_agent"
+    serving_dc_id: str
+    serving_dc_on_hand: int
+    serving_dc_safety_buffer: int
+    serving_dc_atp_surplus: int
+    requested_units: int
+    serving_dc_has_stock: bool
+    escalated_to_fmcg: bool = False
+    selected_source_node: str
+    selected_source_atp_surplus: int
+    order_type: str  # "STO_FROM_DC" or "PO_TO_FMCG"
+    unit_gross_margin_usd: float = 6.20
+    protected_margin_usd: float
+    merchandise_cost_usd: float = 0.0
+    supplier_negotiation_summary: str = ""
+    mcp_tools_called: List[str] = Field(default_factory=list)
+    activities_performed: List[str] = Field(default_factory=list)
+    finding_summary: str
+
+
+class LogisticsAgentCommonOutput(BaseModel):
+    """Standardized output contract from Carrier & Logistics Agent (`logistics_agent`)."""
+    agent_name: str = "logistics_agent"
+    origin_node: str
+    destination_store: str
+    carrier_name: str
+    freight_mode: str
+    transit_hours: float
+    sla_window_hours: float
+    freight_cost_usd: float
+    total_commitment_usd: float
+    carrier_negotiation_summary: str = ""
+    mcp_tools_called: List[str] = Field(default_factory=list)
+    activities_performed: List[str] = Field(default_factory=list)
+    finding_summary: str
+
+
+class MultiAgentCommonOutput(BaseModel):
+    """Standardized Common Multi-Agent Output JSON produced by the NexusTwin AI Multi-Agent System
+    before passing into the 4 Mandatory Mathematical Gate Checks.
+    """
+    event_id: str
+    scenario_key: Optional[str] = None
+    sensing_agent_output: SensingAgentCommonOutput
+    replenishment_agent_output: ReplenishmentAgentCommonOutput
+    logistics_agent_output: LogisticsAgentCommonOutput
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 class GateRuleResult(BaseModel):
     """Evaluation result for an individual Feasibility Gate rule."""
     rule_name: str
     passed: bool
     threshold: Any
     actual_value: Any
+    formula_expression: str = ""
     message: str
 
 
@@ -142,6 +212,8 @@ class ReplenishmentDecisionManifest(BaseModel):
     remote_executed: bool = False
     agent_response_text: Optional[str] = None
     step_events: List[Dict[str, Any]] = Field(default_factory=list)
+    common_agent_output: Optional[MultiAgentCommonOutput] = None
+    gate_evaluation: Optional[GateEvaluationResult] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 

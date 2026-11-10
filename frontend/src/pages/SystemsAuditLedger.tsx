@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Database, Search, Filter, ShieldCheck, Download, RefreshCw, FileText, CheckCircle, Clock, ExternalLink } from 'lucide-react';
+import { Search, Filter, Download, RefreshCw, FileText, Clock, CheckCircle2 } from 'lucide-react';
 import { AuditRecord } from '../types';
 
 export const SystemsAuditLedger: React.FC = () => {
@@ -11,76 +11,42 @@ export const SystemsAuditLedger: React.FC = () => {
 
   const mockAuditLedger: AuditRecord[] = [
     {
-      event_id: 'evt_tx_9921',
-      timestamp: '2026-10-29T12:35:10Z',
-      signal_source: 'POS_CHECKOUT_STREAM',
-      store_id: 'STORE-DAL-04',
-      sku_id: 'SKU-4089-HYDRATE',
-      observed_velocity: 85.0,
-      root_cause_explanation: 'Demand surge (+380% over baseline) confirmed authentic consumer pull. Driven by an ambient 98.2°F heatwave coinciding with North Texas Youth Soccer Cup (12,000 attendees within 1.8 mi).',
-      selected_donor_dc: 'DC-ATX-02',
+      event_id: 'evt_shop1_pos_dc_sto',
+      timestamp: '2026-11-06T12:35:10Z',
+      signal_source: 'STORE_CHECKOUT_SPIKE',
+      store_id: 'STORE-DAL-04 (Dallas Uptown)',
+      sku_id: 'HydroBoost Electrolyte 12-Pack',
+      observed_velocity: 215.0,
+      root_cause_explanation:
+        'Checkout sales jumped +348% over normal due to 98.2°F heatwave and local youth soccer tournament. Dispatched 1,500 packs from Austin Regional Warehouse.',
+      selected_donor_dc: 'DC-ATX-02 (Austin Warehouse)',
       units_transferred: 1500,
-      freight_mode: 'LATERAL_GROUND_TRANSFER',
-      carrier_name: 'Texas Fleet Logistics (Dedicated)',
-      estimated_freight_cost: 750.00,
+      freight_mode: 'Dedicated Ground Truck',
+      carrier_name: 'Texas Fleet Logistics',
+      estimated_freight_cost: 750.0,
       gate_status: 'APPROVED',
       requires_human_approval: false,
-      approver_name: 'NexusTwin Autonomous Agent Swarm (Cost < $1,000)',
+      approver_name: 'Auto-Approved (Under $1,000 Shipping Limit)',
       sap_transfer_order_id: 'STO-SAP-99214',
     },
     {
-      event_id: 'evt_tx_9922',
-      timestamp: '2026-10-29T11:15:42Z',
-      signal_source: 'POS_CHECKOUT_STREAM',
-      store_id: 'STORE-FW-02',
-      sku_id: 'SKU-8821-SNACK',
-      observed_velocity: 42.5,
-      root_cause_explanation: 'Promotion-driven velocity spike (+120%) due to local weekend tailgate promotion. Validated against store inventory threshold.',
-      selected_donor_dc: 'DC-SAT-03',
-      units_transferred: 800,
-      freight_mode: 'LATERAL_GROUND_TRANSFER',
-      carrier_name: 'LoneStar Freight Express',
-      estimated_freight_cost: 420.00,
+      event_id: 'evt_shop3_weather_25d',
+      timestamp: '2026-11-06T11:15:42Z',
+      signal_source: '25_DAY_WEATHER_FORECAST',
+      store_id: 'STORE-PLANO-07 (Plano Legacy)',
+      sku_id: 'HydroBoost Electrolyte 12-Pack',
+      observed_velocity: 128.0,
+      root_cause_explanation:
+        '25-Day Weather Forecast identified a 104.2°F Heat Dome arriving in 25 days. Shipped 1,500 packs early via low-cost economy ground freight ($480).',
+      selected_donor_dc: 'DC-ATX-02 (Austin Warehouse)',
+      units_transferred: 1500,
+      freight_mode: 'Economy Pre-Stock Truck',
+      carrier_name: 'Texas Economy Ground',
+      estimated_freight_cost: 480.0,
       gate_status: 'APPROVED',
       requires_human_approval: false,
-      approver_name: 'NexusTwin Autonomous Agent Swarm (Cost < $1,000)',
-      sap_transfer_order_id: 'STO-SAP-99215',
-    },
-    {
-      event_id: 'evt_tx_9923_high_val',
-      timestamp: '2026-10-29T10:45:00Z',
-      signal_source: 'POS_CHECKOUT_STREAM',
-      store_id: 'STORE-DAL-04',
-      sku_id: 'SKU-1022-PROTEIN',
-      observed_velocity: 64.0,
-      root_cause_explanation: 'Regional fitness expo created sudden stocking void. Expedited replenishment requested to maintain shelf presence.',
-      selected_donor_dc: 'DC-HOU-01',
-      units_transferred: 2400,
-      freight_mode: 'EXPEDITED_AIR_FREIGHT',
-      carrier_name: 'LoneStar Expedited Air Cargo',
-      estimated_freight_cost: 3500.00,
-      gate_status: 'APPROVED',
-      requires_human_approval: true,
-      approver_name: 'VP Supply Chain Operations (Manual Approval)',
-      sap_transfer_order_id: 'STO-SAP-99216',
-    },
-    {
-      event_id: 'evt_tx_9918',
-      timestamp: '2026-10-28T18:22:15Z',
-      signal_source: 'SAP_ERP_INVENTORY_DELTA',
-      store_id: 'STORE-PLANO-07',
-      sku_id: 'SKU-4089-HYDRATE',
-      observed_velocity: 38.0,
-      root_cause_explanation: 'Standard distribution buffer balancing. Lead time analysis shows 18 hours buffer remaining.',
-      selected_donor_dc: 'DC-ATX-02',
-      units_transferred: 600,
-      freight_mode: 'LATERAL_GROUND_TRANSFER',
-      carrier_name: 'Texas Fleet Logistics (Dedicated)',
-      estimated_freight_cost: 380.00,
-      gate_status: 'APPROVED',
-      requires_human_approval: false,
-      approver_name: 'NexusTwin Autonomous Agent Swarm (Cost < $1,000)',
-      sap_transfer_order_id: 'STO-SAP-99210',
+      approver_name: 'Auto-Approved (Under $1,000 Shipping Limit)',
+      sap_transfer_order_id: 'STO-SAP-25D91',
     },
   ];
 
@@ -127,7 +93,7 @@ export const SystemsAuditLedger: React.FC = () => {
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(records, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute('href', dataStr);
-    downloadAnchor.setAttribute('download', `nexustwin_audit_ledger_${new Date().toISOString()}.json`);
+    downloadAnchor.setAttribute('download', `nexustwin_order_history_${new Date().toISOString()}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
@@ -136,171 +102,170 @@ export const SystemsAuditLedger: React.FC = () => {
   return (
     <div className="h-full flex flex-col p-6 space-y-6 overflow-y-auto">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white border border-[#E6E0D3] rounded-2xl p-5 shadow-enterprise flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center space-x-2">
-            <h1 className="text-xl font-bold tracking-tight text-white">Systems Audit Ledger</h1>
-            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-teal-500/20 text-teal-300 border border-teal-500/30">
-              BigQuery Lakehouse Sink
+            <h1 className="font-serif text-lg font-bold text-[#1C1917]">
+              Completed Restock Orders &amp; Decision History
+            </h1>
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#F2F8F4] text-[#2D6A4F] border border-[#C3DFCD]">
+              Saved to Cloud Audit Log
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Immutable supply chain decision trace log: signal ingest $\rightarrow$ multi-agent deliberation $\rightarrow$ 4-Rule Feasibility Gate $\rightarrow$ SAP STO creation.
+          <p className="text-xs text-[#78716C] mt-1">
+            Complete history of every store demand alert, warehouse/factory shipment, shipping cost, and manager sign-off.
           </p>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2.5">
           <button
             onClick={fetchLedger}
-            className="flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700 transition"
+            className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-[#FAF7F2] text-[#1C1917] hover:bg-[#F3EFE6] border border-[#E6E0D3] transition cursor-pointer"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-            <span>Refresh</span>
+            <RefreshCw className={`h-3.5 w-3.5 text-[#2D6A4F] ${isLoading ? 'animate-spin' : ''}`} />
+            <span>Refresh Log</span>
           </button>
           <button
             onClick={exportToJson}
-            className="flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-teal-500 hover:bg-teal-400 text-slate-950 transition shadow-sm"
+            className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#2D6A4F] hover:bg-[#1E4D38] text-white transition shadow-xs cursor-pointer"
           >
             <Download className="h-3.5 w-3.5" />
-            <span>Export Lakehouse JSON</span>
+            <span>Download Report</span>
           </button>
         </div>
       </div>
 
       {/* Control / Filter Bar */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-3 bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-[#E6E0D3] shadow-enterprise">
         <div className="relative w-full md:w-80">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-[#78716C]" />
           <input
             type="text"
-            placeholder="Search event ID, SKU, store or cause..."
+            placeholder="Search store, order ID, or reason..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-500"
+            className="w-full bg-[#FAF7F2] border border-[#E6E0D3] rounded-xl pl-9 pr-3 py-1.5 text-xs text-[#1C1917] placeholder-[#78716C] focus:outline-none focus:border-[#2D6A4F]"
           />
         </div>
 
         <div className="flex items-center space-x-2 w-full md:w-auto">
-          <span className="text-xs text-slate-400 flex items-center space-x-1">
+          <span className="text-xs text-[#78716C] font-semibold flex items-center space-x-1">
             <Filter className="h-3.5 w-3.5" />
-            <span>Filter:</span>
+            <span>Show:</span>
           </span>
           <button
             onClick={() => setSelectedStatus('ALL')}
-            className={`px-2.5 py-1 rounded text-xs transition ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
               selectedStatus === 'ALL'
-                ? 'bg-teal-500/20 text-teal-300 border border-teal-500/40 font-semibold'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-[#2D6A4F] text-white'
+                : 'text-[#57534E] hover:bg-[#FAF7F2]'
             }`}
           >
-            All Traces ({records.length})
+            All Orders ({records.length})
           </button>
           <button
             onClick={() => setSelectedStatus('AUTONOMOUS')}
-            className={`px-2.5 py-1 rounded text-xs transition ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
               selectedStatus === 'AUTONOMOUS'
-                ? 'bg-teal-500/20 text-teal-300 border border-teal-500/40 font-semibold'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-[#2D6A4F] text-white'
+                : 'text-[#57534E] hover:bg-[#FAF7F2]'
             }`}
           >
-            Autonomous (&lt; $1k)
+            Auto-Approved (&le; $1k)
           </button>
           <button
             onClick={() => setSelectedStatus('HITL')}
-            className={`px-2.5 py-1 rounded text-xs transition ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
               selectedStatus === 'HITL'
-                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-[#B7791F] text-white'
+                : 'text-[#57534E] hover:bg-[#FAF7F2]'
             }`}
           >
-            HITL Escalated
+            Manager Approved (&gt; $1k)
           </button>
         </div>
       </div>
 
       {/* Ledger Table */}
-      <div className="bg-slate-900/60 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
+      <div className="bg-white border border-[#E6E0D3] rounded-2xl overflow-hidden shadow-enterprise">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-950/80 text-slate-400 uppercase tracking-wider text-[11px] border-b border-slate-800">
+            <thead className="bg-[#FAF7F2] text-[#78716C] uppercase tracking-wider text-[11px] border-b border-[#E6E0D3]">
               <tr>
-                <th className="py-3 px-4 font-semibold">Event ID & Timestamp</th>
-                <th className="py-3 px-4 font-semibold">Store / SKU</th>
-                <th className="py-3 px-4 font-semibold">Velocity</th>
-                <th className="py-3 px-4 font-semibold">Transfer Details</th>
-                <th className="py-3 px-4 font-semibold">Freight & Cost</th>
-                <th className="py-3 px-4 font-semibold">Gate & Approver</th>
-                <th className="py-3 px-4 font-semibold">SAP Order</th>
-                <th className="py-3 px-4 font-semibold text-right">Action</th>
+                <th className="py-3.5 px-4 font-bold">Time &amp; Alert</th>
+                <th className="py-3.5 px-4 font-bold">Store Location</th>
+                <th className="py-3.5 px-4 font-bold">Demand Speed</th>
+                <th className="py-3.5 px-4 font-bold">Restock Shipment</th>
+                <th className="py-3.5 px-4 font-bold">Shipping Cost</th>
+                <th className="py-3.5 px-4 font-bold">Approval Type</th>
+                <th className="py-3.5 px-4 font-bold">Order Number</th>
+                <th className="py-3.5 px-4 font-bold text-right">Details</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60 text-slate-300">
-              {filteredRecords.map((rec) => (
-                <tr key={rec.event_id} className="hover:bg-slate-800/40 transition">
-                  <td className="py-3 px-4">
-                    <div className="font-mono text-teal-300 font-bold">{rec.event_id}</div>
-                    <div className="text-[10px] text-slate-500 flex items-center space-x-1 mt-0.5">
+            <tbody className="divide-y divide-[#E6E0D3] text-[#44403C]">
+              {filteredRecords.map((rec, i) => (
+                <tr key={`${rec.event_id}-${i}`} className="hover:bg-[#FAF7F2] transition">
+                  <td className="py-3.5 px-4">
+                    <div className="font-mono text-[#2D6A4F] font-bold">{rec.event_id}</div>
+                    <div className="text-[10px] text-[#78716C] flex items-center space-x-1 mt-0.5">
                       <Clock className="h-3 w-3" />
                       <span>{new Date(rec.timestamp).toLocaleTimeString()}</span>
                     </div>
                   </td>
 
-                  <td className="py-3 px-4">
-                    <div className="font-medium text-white">{rec.store_id}</div>
-                    <div className="text-[11px] text-slate-400 font-mono">{rec.sku_id}</div>
+                  <td className="py-3.5 px-4">
+                    <div className="font-bold text-[#1C1917]">{rec.store_id}</div>
+                    <div className="text-[11px] text-[#78716C]">HydroBoost 12-Pack</div>
                   </td>
 
-                  <td className="py-3 px-4">
-                    <div className="font-semibold text-emerald-400">{rec.observed_velocity} u/hr</div>
-                    <div className="text-[10px] text-slate-500">{rec.signal_source}</div>
+                  <td className="py-3.5 px-4">
+                    <div className="font-bold text-[#B54834]">{rec.observed_velocity} packs/hr</div>
+                    <div className="text-[10px] text-[#78716C]">{rec.signal_source}</div>
                   </td>
 
-                  <td className="py-3 px-4">
-                    <div className="text-white font-medium">
-                      {rec.units_transferred.toLocaleString()} units
+                  <td className="py-3.5 px-4">
+                    <div className="text-[#1C1917] font-bold">
+                      {rec.units_transferred.toLocaleString()} packs
                     </div>
-                    <div className="text-[11px] text-slate-400">from {rec.selected_donor_dc}</div>
+                    <div className="text-[11px] text-[#78716C]">From {rec.selected_donor_dc}</div>
                   </td>
 
-                  <td className="py-3 px-4">
-                    <div className="font-mono font-bold text-amber-300">
+                  <td className="py-3.5 px-4">
+                    <div className="font-mono font-bold text-[#1C1917]">
                       ${rec.estimated_freight_cost.toFixed(2)}
                     </div>
-                    <div className="text-[10px] text-slate-400 truncate max-w-[140px]">{rec.carrier_name}</div>
+                    <div className="text-[10px] text-[#78716C] truncate max-w-[150px]">{rec.carrier_name}</div>
                   </td>
 
-                  <td className="py-3 px-4">
+                  <td className="py-3.5 px-4">
                     <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
                         rec.requires_human_approval
-                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                          : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                          ? 'bg-[#FEF9EE] text-[#925E14] border-[#F9DFAA]'
+                          : 'bg-[#F2F8F4] text-[#1E4D38] border-[#C3DFCD]'
                       }`}
                     >
-                      {rec.requires_human_approval ? 'HITL Approved' : 'Autonomous Gate'}
+                      {rec.requires_human_approval ? 'Manager Signed-Off' : 'Auto-Approved'}
                     </span>
-                    <div className="text-[10px] text-slate-400 truncate max-w-[150px] mt-1">
-                      {rec.approver_name}
-                    </div>
                   </td>
 
-                  <td className="py-3 px-4">
+                  <td className="py-3.5 px-4">
                     {rec.sap_transfer_order_id ? (
-                      <span className="font-mono text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/40 text-[11px]">
+                      <span className="font-mono font-bold text-[#2D6A4F] bg-[#F2F8F4] px-2.5 py-1 rounded-lg border border-[#C3DFCD] text-[11px]">
                         {rec.sap_transfer_order_id}
                       </span>
                     ) : (
-                      <span className="text-slate-500 font-mono text-[11px]">—</span>
+                      <span className="text-[#B7791F] font-semibold text-[11px]">Awaiting Sign-Off</span>
                     )}
                   </td>
 
-                  <td className="py-3 px-4 text-right">
+                  <td className="py-3.5 px-4 text-right">
                     <button
                       onClick={() => setSelectedRecord(rec)}
-                      className="inline-flex items-center space-x-1 text-xs text-teal-400 hover:text-teal-300 transition"
+                      className="inline-flex items-center space-x-1 text-xs font-bold text-[#2D6A4F] hover:text-[#1E4D38] transition cursor-pointer"
                     >
                       <FileText className="h-3.5 w-3.5" />
-                      <span>Trace</span>
+                      <span>View</span>
                     </button>
                   </td>
                 </tr>
@@ -310,65 +275,56 @@ export const SystemsAuditLedger: React.FC = () => {
         </div>
       </div>
 
-      {/* Trace Detail Modal */}
+      {/* Order Detail Modal */}
       {selectedRecord && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 bg-[#1C1917]/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-[#E6E0D3] rounded-2xl max-w-2xl w-full p-6 shadow-enterprise-lg space-y-4">
+            <div className="flex items-center justify-between border-b border-[#E6E0D3] pb-3">
               <div className="flex items-center space-x-2">
-                <Database className="h-5 w-5 text-teal-400" />
-                <h3 className="text-sm font-bold text-white">
-                  Lakehouse Audit Manifest: {selectedRecord.event_id}
+                <CheckCircle2 className="h-5 w-5 text-[#2D6A4F]" />
+                <h3 className="font-serif text-base font-bold text-[#1C1917]">
+                  Order Decision Summary: {selectedRecord.event_id}
                 </h3>
               </div>
               <button
                 onClick={() => setSelectedRecord(null)}
-                className="text-slate-400 hover:text-white text-xs font-semibold px-2 py-1 bg-slate-800 rounded"
+                className="text-[#44403C] hover:text-[#1C1917] text-xs font-bold px-3 py-1.5 bg-[#FAF7F2] border border-[#E6E0D3] rounded-lg cursor-pointer"
               >
                 Close
               </button>
             </div>
 
             <div className="space-y-3 text-xs">
-              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2">
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-teal-400">
-                  Root Cause Explanation (Sensing Agent)
+              <div className="bg-[#F2F8F4] p-4 rounded-xl border border-[#C3DFCD] space-y-1.5">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-[#1E4D38]">
+                  Why This Restock Order Was Created
                 </div>
-                <p className="text-slate-300 leading-relaxed">{selectedRecord.root_cause_explanation}</p>
+                <p className="text-[#44403C] leading-relaxed whitespace-pre-line">
+                  {selectedRecord.root_cause_explanation}
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
-                  <span className="text-slate-500 block text-[10px]">Source & Target</span>
-                  <span className="text-white font-semibold">
-                    {selectedRecord.selected_donor_dc} $\rightarrow$ {selectedRecord.store_id}
+                <div className="bg-[#FAF7F2] p-3.5 rounded-xl border border-[#E6E0D3]">
+                  <span className="text-[#78716C] block text-[10px] font-semibold">Shipment Route</span>
+                  <span className="text-[#1C1917] font-bold">
+                    {selectedRecord.selected_donor_dc} &rarr; {selectedRecord.store_id}
                   </span>
                 </div>
-                <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
-                  <span className="text-slate-500 block text-[10px]">Carrier & Freight Mode</span>
-                  <span className="text-white font-semibold">
-                    {selectedRecord.carrier_name} ({selectedRecord.freight_mode})
+                <div className="bg-[#FAF7F2] p-3.5 rounded-xl border border-[#E6E0D3]">
+                  <span className="text-[#78716C] block text-[10px] font-semibold">Trucking Carrier</span>
+                  <span className="text-[#1C1917] font-bold">{selectedRecord.carrier_name}</span>
+                </div>
+                <div className="bg-[#FAF7F2] p-3.5 rounded-xl border border-[#E6E0D3]">
+                  <span className="text-[#78716C] block text-[10px] font-semibold">Approved By</span>
+                  <span className="text-[#2D6A4F] font-bold">{selectedRecord.approver_name}</span>
+                </div>
+                <div className="bg-[#FAF7F2] p-3.5 rounded-xl border border-[#E6E0D3]">
+                  <span className="text-[#78716C] block text-[10px] font-semibold">Order Confirmation #</span>
+                  <span className="text-[#2D6A4F] font-mono font-bold">
+                    {selectedRecord.sap_transfer_order_id || 'Waiting for Approval'}
                   </span>
                 </div>
-                <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
-                  <span className="text-slate-500 block text-[10px]">Governance Approver</span>
-                  <span className="text-teal-300 font-semibold">{selectedRecord.approver_name}</span>
-                </div>
-                <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
-                  <span className="text-slate-500 block text-[10px]">SAP S/4HANA Order ID</span>
-                  <span className="text-emerald-400 font-mono font-bold">
-                    {selectedRecord.sap_transfer_order_id || 'PENDING_APPROVAL'}
-                  </span>
-                </div>
-              </div>
-
-              <div>
-                <span className="text-slate-500 block text-[10px] mb-1">
-                  Raw BigQuery Lakehouse Schema Payload
-                </span>
-                <pre className="bg-slate-950 p-3 rounded-lg border border-slate-800 text-[11px] font-mono text-slate-300 overflow-x-auto max-h-48">
-                  {JSON.stringify(selectedRecord, null, 2)}
-                </pre>
               </div>
             </div>
           </div>

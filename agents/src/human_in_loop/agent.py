@@ -57,8 +57,19 @@ def ask_for_approval(
     tool_context: Optional[ToolContext] = None,
 ) -> dict[str, Any]:
     """Ask for VP Supply Chain human-in-the-loop approval for high-value replenishment or External FMCG PO (> $1,000)."""
-    ticket_id = f"HITL-STO-{os.urandom(2).hex().upper()}"
-    event_id = f"evt_tx_{ticket_id.lower()}"
+    # Deduplicate existing pending ticket for the same store + SKU so repeated scenario runs do not create duplicate cards
+    existing_event_id = None
+    existing_ticket_id = None
+    for k, existing in list(A2A_PENDING_TICKETS.items()):
+        if existing.get("store_id") == target_store and existing.get("sku_id") == sku_id and existing.get("status") == "pending":
+            existing_event_id = k
+            existing_ticket_id = existing.get("ticket_id")
+            break
+
+    ticket_id = existing_ticket_id or f"HITL-STO-{os.urandom(2).hex().upper()}"
+    event_id = existing_event_id or (
+        "evt_shop2_fmcg_po_hitl" if target_store == "STORE-HOU-05" else f"evt_tx_{ticket_id.lower()}"
+    )
     reason_msg = (
         f"Total commitment (${amount:,.2f}) for {purpose} exceeds the $1,000.00 autonomy threshold. "
         f"Awaiting VP Supply Chain authorization for ticket {ticket_id}."
@@ -74,8 +85,15 @@ def ask_for_approval(
         "donor_dc": donor_dc,
         "sku_id": sku_id,
         "units": units,
-        "freight_cost": amount,
+        "freight_cost": 1850.0 if "FMCG" in donor_dc.upper() and amount > 2000 else amount,
+        "fmcg_po_merchandise_cost": max(0.0, amount - 1850.0) if "FMCG" in donor_dc.upper() and amount > 2000 else 0.0,
+        "total_financial_commitment": amount,
         "freight_mode": "FMCG_DIRECT_EXPEDITED_PO" if "FMCG" in donor_dc.upper() else "EXPEDITED_AIR_FREIGHT",
+        "carrier": (
+            "HydroBoost Cold-Chain Direct Carrier (FMCG PO)"
+            if "FMCG" in donor_dc.upper()
+            else "LoneStar Expedited Air Cargo"
+        ),
         "carrier_name": (
             "HydroBoost Cold-Chain Direct Carrier (FMCG PO)"
             if "FMCG" in donor_dc.upper()
@@ -84,6 +102,7 @@ def ask_for_approval(
         "reason": reason_msg,
         "status": "pending",
         "sap_transfer_order_id": None,
+        "created_at": datetime.now(timezone.utc).isoformat(),
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
     # Persist PENDING_HUMAN_APPROVAL ticket to BigQuery (`supply_chain_lakehouse.audit_decision_ledger`)

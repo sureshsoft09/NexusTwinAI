@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { CheckCircle, UserCheck, Clock, Network, ExternalLink, Terminal, RefreshCw } from 'lucide-react';
+import React, { useState } from 'react';
+import { CheckCircle2, UserCheck, Clock, RefreshCw, ShieldCheck, Factory } from 'lucide-react';
 
-interface A2AApprovalCard {
+export interface A2AApprovalCard {
   ticket_id: string;
   event_id: string;
   agent_name: string;
@@ -14,282 +14,255 @@ interface A2AApprovalCard {
   sku_id: string;
   units: number;
   freight_cost: number;
+  fmcg_po_merchandise_cost?: number;
+  total_financial_commitment?: number;
   freight_mode: string;
   carrier: string;
   reason: string;
   created_at: string;
   sap_order_id?: string;
+  sap_transfer_order_id?: string;
 }
 
-const DEFAULT_FALLBACK_CARDS: A2AApprovalCard[] = [
+export const DEFAULT_FALLBACK_CARDS: A2AApprovalCard[] = [
   {
-    ticket_id: 'HITL-FMCG-PO-HOU-05-1800',
+    ticket_id: 'PO-REQ-HOU-1800',
     event_id: 'evt_shop2_fmcg_po_hitl',
-    agent_name: 'approval_agent',
+    agent_name: 'VP Supply Chain Approval Gate',
     agent_card_url: 'http://localhost:8001/a2a/human_in_loop/.well-known/agent.json',
-    a2a_task_state: 'input-required',
-    tool_invoked: 'LongRunningFunctionTool(ask_for_approval)',
+    a2a_task_state: 'Awaiting Manager Signature',
+    tool_invoked: 'Factory Purchase Order Approval',
     status: 'pending',
-    store_id: 'Shop 2: STORE-HOU-05 (Houston Galleria)',
-    donor_dc: 'FMCG-PLANT-TX01 (because DC-HOU-01 has only 180 ATP)',
-    sku_id: 'SKU-4089-HYDRATE (HydroBoost Electrolyte 12-Pack)',
+    store_id: 'STORE-HOU-05',
+    donor_dc: 'FMCG-PLANT-TX01 (via DC-HOU-01)',
+    sku_id: 'SKU-4089-HYDRATE',
     units: 1800,
-    freight_cost: 1850.00,
-    freight_mode: 'FMCG_DIRECT_EXPEDITED_PO ($15,822 Merchandise + $1,850 Freight)',
-    carrier: 'HydroBoost Cold-Chain Direct Carrier (FMCG PO)',
+    freight_cost: 1850.0,
+    fmcg_po_merchandise_cost: 15822.0,
+    total_financial_commitment: 17672.0,
+    freight_mode: 'Direct Factory Cold-Chain Truck ($15,822 Product + $1,850 Shipping)',
+    carrier: 'HydroBoost Direct Cold-Chain Carrier',
     reason:
-      'Serving DC (DC-HOU-01) lacked sufficient stock (180 ATP < 1,800 needed). Escalated to External FMCG PO ($17,672 total commitment / $1,850 freight > $1,000 limit). Handed over by twin_supervisor to RemoteA2aAgent.',
-    created_at: '2026-11-05T12:45:00Z',
+      'Houston Warehouse (DC-HOU-01) only has 180 spare packs—not enough for Houston Galleria Store’s 1,800-pack surge. The AI prepared a direct Factory Purchase Order to Waco Bottling Factory ($17,672 total / $1,850 shipping) which requires VP approval because it exceeds the $1,000 automatic limit.',
+    created_at: '2026-11-06T12:45:00Z',
   },
 ];
 
-export const ApprovalsQueue: React.FC = () => {
-  const [cards, setCards] = useState<A2AApprovalCard[]>(DEFAULT_FALLBACK_CARDS);
-  const [approvedOrders, setApprovedOrders] = useState<Record<string, string>>({});
+interface ApprovalsQueueProps {
+  cards: A2AApprovalCard[];
+  approvedOrders: Record<string, string>;
+  pendingCount: number;
+  onApproveCard: (eventId: string) => Promise<void>;
+  onRefreshCards: () => Promise<void>;
+}
+
+const STORE_FRIENDLY_NAME: Record<string, string> = {
+  'STORE-HOU-05': 'Shop 2: Houston Galleria Store (STORE-HOU-05)',
+  'STORE-DAL-04': 'Shop 1: Dallas Uptown Store (STORE-DAL-04)',
+  'STORE-PLANO-07': 'Shop 3: Plano Legacy Store (STORE-PLANO-07)',
+  'STORE-ARL-11': 'Shop 4: Arlington Stadium Store (STORE-ARL-11)',
+};
+
+const SOURCE_FRIENDLY_NAME: Record<string, string> = {
+  'FMCG-PLANT-TX01': 'Waco Bottling Factory (FMCG-PLANT-TX01)',
+  'FMCG-PLANT-TX01 (via DC-HOU-01)': 'Waco Bottling Factory (because Houston Warehouse only has 180 spare packs)',
+  'DC-ATX-02': 'Austin Regional Warehouse (DC-ATX-02)',
+  'DC-HOU-01': 'Houston Regional Warehouse (DC-HOU-01)',
+  'DC-SAT-03': 'San Antonio Regional Warehouse (DC-SAT-03)',
+};
+
+export const ApprovalsQueue: React.FC<ApprovalsQueueProps> = ({
+  cards,
+  approvedOrders,
+  pendingCount,
+  onApproveCard,
+  onRefreshCards,
+}) => {
   const [loadingItem, setLoadingItem] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
 
-  const fetchPendingCards = async () => {
-    try {
-      const res = await fetch('/api/v1/governance/pending');
-      if (res.ok) {
-        const data = await res.json();
-        const list = Array.isArray(data) ? data : data.pending_approvals;
-        if (Array.isArray(list)) {
-          setCards(list.length > 0 ? list : DEFAULT_FALLBACK_CARDS);
-        }
-      }
-    } catch {
-      // Keep fallback cards when running UI standalone
-    }
-  };
-
-  useEffect(() => {
-    fetchPendingCards();
-  }, []);
-
-  const handleApprove = async (eventId: string) => {
+  const handleApproveClick = async (eventId: string) => {
     setLoadingItem(eventId);
     try {
-      const res = await fetch('/api/v1/governance/approve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          event_id: eventId,
-          approved: true,
-          approver_name: 'VP Supply Chain Operations',
-          approver_email: 'vp.ops@enterprise-fmcg.com',
-          comments: 'Approved via React Control Tower A2A Card',
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const sapOrder = data.erp_transfer_order_id || 'STO-SAP-99215';
-        setApprovedOrders((prev) => ({ ...prev, [eventId]: sapOrder }));
-      } else {
-        setApprovedOrders((prev) => ({ ...prev, [eventId]: 'STO-SAP-99215' }));
-      }
-    } catch {
-      setApprovedOrders((prev) => ({ ...prev, [eventId]: 'STO-SAP-99215' }));
+      await onApproveCard(eventId);
     } finally {
       setLoadingItem(null);
     }
   };
 
-  const pendingCount = cards.filter((c) => !approvedOrders[c.event_id] && c.status !== 'approved').length;
+  const handleRefreshClick = async () => {
+    setRefreshing(true);
+    try {
+      await onRefreshCards();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   return (
     <div className="h-full flex flex-col p-6 space-y-6 overflow-y-auto">
-      <div className="flex items-center justify-between">
+      <div className="bg-white border border-[#E6E0D3] rounded-2xl p-5 shadow-enterprise flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-white">
-            Supply Chain Governance &amp; RemoteA2aAgent Approvals Queue
+          <h1 className="font-serif text-lg font-bold text-[#1C1917]">
+            Manager Sign-Off Queue (Orders Over $1,000 Auto-Approval Cap)
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
-            Enforcing the 4-Rule Supply Chain Feasibility Gate ($1,000 Autonomy Threshold) via Google ADK{' '}
-            <code className="text-teal-400 font-mono">RemoteA2aAgent</code>.
+          <p className="text-xs text-[#78716C] mt-1">
+            Routine warehouse transfers &le; $1,000 ship automatically. Larger orders or direct Factory Purchase Orders pause here for 1-click VP approval.
           </p>
         </div>
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-3 shrink-0">
           <button
-            onClick={fetchPendingCards}
-            className="flex items-center space-x-1.5 text-xs text-slate-300 hover:text-white bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-lg transition"
+            onClick={handleRefreshClick}
+            className="flex items-center space-x-1.5 text-xs text-[#1C1917] hover:bg-[#F3EFE6] bg-[#FAF7F2] border border-[#E6E0D3] px-3.5 py-2 rounded-xl font-semibold transition cursor-pointer"
           >
-            <RefreshCw className="h-3.5 w-3.5" />
-            <span>Sync A2A Queue</span>
+            <RefreshCw className={`h-3.5 w-3.5 text-[#2D6A4F] ${refreshing ? 'animate-spin' : ''}`} />
+            <span>Refresh Queue</span>
           </button>
-          <div className="flex items-center space-x-2 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-lg">
-            <Clock className="h-4 w-4" />
-            <span>Pending A2A Decisions: {pendingCount}</span>
+          <div className="flex items-center space-x-2 text-xs text-[#925E14] bg-[#FEF9EE] border border-[#F9DFAA] px-3.5 py-2 rounded-xl font-bold">
+            <Clock className="h-4 w-4 text-[#B7791F]" />
+            <span>Waiting for Sign-Off: {pendingCount}</span>
           </div>
         </div>
       </div>
 
-      {/* RemoteA2aAgent Architecture Banner */}
-      <div className="bg-slate-900/80 border border-teal-500/30 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-start space-x-3">
-          <div className="p-2 rounded-lg bg-teal-500/10 border border-teal-500/30 text-teal-400 mt-0.5">
-            <Network className="h-5 w-5" />
-          </div>
-          <div className="space-y-1">
-            <div className="flex items-center space-x-2">
-              <span className="text-xs font-bold text-white">ADK RemoteA2aAgent Handover Active</span>
-              <span className="text-[10px] font-mono bg-teal-500/20 text-teal-300 px-2 py-0.5 rounded border border-teal-500/30">
-                sub_agents=[approval_agent]
-              </span>
-            </div>
-            <p className="text-xs text-slate-400">
-              Orders &le; $1,000 are auto-dispatched by <code className="text-slate-200 font-mono">twin_supervisor</code> via{' '}
-              <code className="text-teal-300 font-mono">execute_replenishment_sto()</code>. Orders &gt; $1,000 are delegated to{' '}
-              <code className="text-amber-300 font-mono">approval_agent</code> over A2A protocol and surfaced here via{' '}
-              <code className="text-slate-200 font-mono">GET /api/v1/governance/pending</code>.
-            </p>
-          </div>
+      {/* 4 Mathematical Feasibility Gate Rules Summary */}
+      <div className="bg-white border border-[#E6E0D3] rounded-2xl p-5 shadow-enterprise">
+        <div className="flex items-center space-x-2 mb-3">
+          <ShieldCheck className="h-4 w-4 text-[#2D6A4F]" />
+          <h2 className="font-serif text-sm font-bold text-[#1C1917]">
+            The 4 Mathematical Safety Checks Verified Before Any Order Reaches This Queue
+          </h2>
         </div>
-        <div className="text-right shrink-0 bg-slate-950 px-3 py-2 rounded-lg border border-slate-800">
-          <span className="text-[10px] uppercase tracking-wider text-slate-500 block">A2A Well-Known Agent Card URL</span>
-          <a
-            href="http://localhost:8001/a2a/human_in_loop/.well-known/agent.json"
-            target="_blank"
-            rel="noreferrer"
-            className="text-xs font-mono text-teal-400 hover:underline flex items-center justify-end space-x-1"
-          >
-            <span>http://localhost:8001/a2a/human_in_loop/.well-known/agent.json</span>
-            <ExternalLink className="h-3 w-3" />
-          </a>
-        </div>
-      </div>
-
-      {/* 4-Rule Feasibility Gate Summary Card */}
-      <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">
-          Feasibility Gate Enforcement Architecture
-        </h2>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
-          <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-1">
-            <span className="text-teal-400 font-mono font-bold">Rule 1</span>
-            <p className="font-semibold text-white">INVENTORY_ATP_FEASIBLE</p>
-            <p className="text-[11px] text-slate-400">Verifies donor DC Available-to-Promise &amp; safety buffer.</p>
+          <div className="bg-[#FAF7F2] p-3.5 rounded-xl border border-[#E6E0D3] space-y-1">
+            <span className="text-[#2D6A4F] font-bold">Math Check 1 • Spare Stock</span>
+            <p className="font-bold text-[#1C1917]">Available Spare &ge; Order Qty</p>
+            <p className="text-[11px] text-[#78716C]">Never dips into a warehouse’s emergency safety reserve.</p>
           </div>
-          <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-1">
-            <span className="text-teal-400 font-mono font-bold">Rule 2</span>
-            <p className="font-semibold text-white">SLA_BEFORE_STOCKOUT</p>
-            <p className="text-[11px] text-slate-400">Verifies transit ETA + handling arrives before stockout.</p>
+          <div className="bg-[#FAF7F2] p-3.5 rounded-xl border border-[#E6E0D3] space-y-1">
+            <span className="text-[#2D6A4F] font-bold">Math Check 2 • Delivery SLA</span>
+            <p className="font-bold text-[#1C1917]">Transit Hours &le; Stockout Window</p>
+            <p className="text-[11px] text-[#78716C]">Confirms carrier delivery beats the store’s stockout timer.</p>
           </div>
-          <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-1">
-            <span className="text-teal-400 font-mono font-bold">Rule 3</span>
-            <p className="font-semibold text-white">ROI_MARGIN_POSITIVE</p>
-            <p className="text-[11px] text-slate-400">Verifies protected gross margin exceeds freight cost.</p>
+          <div className="bg-[#FAF7F2] p-3.5 rounded-xl border border-[#E6E0D3] space-y-1">
+            <span className="text-[#2D6A4F] font-bold">Math Check 3 • Profit ROI</span>
+            <p className="font-bold text-[#1C1917]">Protected Margin &gt; Shipping Cost</p>
+            <p className="text-[11px] text-[#78716C]">Ensures gross profit saved ($6.20/pack) exceeds freight cost.</p>
           </div>
-          <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 space-y-1">
-            <span className="text-amber-400 font-mono font-bold">Rule 4</span>
-            <p className="font-semibold text-white">AUTONOMY_OR_HITL</p>
-            <p className="text-[11px] text-slate-400">Transfers &gt; $1,000 handover to RemoteA2aAgent.</p>
+          <div className="bg-[#FEF9EE] p-3.5 rounded-xl border border-[#F9DFAA] space-y-1">
+            <span className="text-[#B7791F] font-bold">Math Check 4 • Auto-Cap</span>
+            <p className="font-bold text-[#1C1917]">Total Commitment &le; $1,000.00</p>
+            <p className="text-[11px] text-[#57534E]">Orders over $1,000 pause here for manager approval.</p>
           </div>
         </div>
       </div>
 
-      {/* Pending A2A Approval Cards List */}
-      <div className="space-y-4">
-        {cards.map((item) => {
-          const sapOrder = approvedOrders[item.event_id] || item.sap_order_id;
-          const isApproved = Boolean(sapOrder) || item.status === 'approved';
-          return (
-            <div
-              key={item.event_id}
-              className={`p-5 rounded-xl border transition ${
-                isApproved
-                  ? 'bg-slate-900/30 border-slate-800 opacity-75'
-                  : 'bg-slate-900/80 border-amber-500/40 shadow-lg shadow-amber-500/5'
-              }`}
-            >
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="space-y-2.5">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
-                        isApproved
-                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                          : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-                      }`}
-                    >
-                      {isApproved
-                        ? 'A2A TASK COMPLETED • SAP STO DISPATCHED'
-                        : `A2A STATE: ${item.a2a_task_state.toUpperCase()} (AWAITING VP SIGNATURE)`}
-                    </span>
-                    <span className="text-xs font-mono text-teal-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
-                      Ticket: {item.ticket_id}
-                    </span>
-                    <span className="text-xs font-mono text-slate-400">Event: {item.event_id}</span>
-                  </div>
+      {/* Pending Approval Cards List */}
+      {cards.length === 0 ? (
+        <div className="bg-white border border-[#E6E0D3] rounded-2xl p-10 text-center space-y-2 shadow-enterprise">
+          <CheckCircle2 className="h-10 w-10 text-[#2D6A4F] mx-auto" />
+          <h3 className="font-serif text-base font-bold text-[#1C1917]">All High-Value Orders Have Been Reviewed!</h3>
+          <p className="text-xs text-[#78716C]">
+            There are 0 orders waiting for manager sign-off. Run Scenario 2 on Tab 1 to simulate a Warehouse Shortage &amp; Factory Purchase Order escalation.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {cards.map((item) => {
+            const sapOrder = approvedOrders[item.event_id] || item.sap_order_id || item.sap_transfer_order_id;
+            const isApproved = Boolean(sapOrder) || item.status === 'approved';
+            const isFactory = (item.donor_dc || '').toUpperCase().includes('FMCG') || (item.donor_dc || '').toUpperCase().includes('WACO');
+            const freightVal = isFactory && item.freight_cost > 2000 ? 1850.0 : item.freight_cost;
+            const totalCommitment =
+              item.total_financial_commitment || (isFactory && item.freight_cost <= 2000 ? item.freight_cost + 15822.0 : item.freight_cost);
+            const storeDisplay = STORE_FRIENDLY_NAME[item.store_id] || item.store_id;
+            const sourceDisplay = SOURCE_FRIENDLY_NAME[item.donor_dc || ''] || item.donor_dc || 'Waco Bottling Factory';
 
-                  <h3 className="text-base font-bold text-white">
-                    {item.store_id} {item.donor_dc ? `← ${item.donor_dc}` : ''}
-                  </h3>
-                  <p className="text-xs text-slate-300">
-                    SKU: <strong className="text-white font-mono">{item.sku_id}</strong> • Volume:{' '}
-                    <strong className="text-white">{item.units.toLocaleString()} units</strong>
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    Mode: {item.freight_mode} ({item.carrier})
-                  </p>
+            return (
+              <div
+                key={item.event_id}
+                className={`p-6 rounded-2xl border transition shadow-enterprise ${
+                  isApproved
+                    ? 'bg-[#F2F8F4] border-[#C3DFCD]'
+                    : 'bg-white border-[#F9DFAA]'
+                }`}
+              >
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={`text-[11px] font-bold px-3 py-1 rounded-full border ${
+                          isApproved
+                            ? 'bg-[#2D6A4F] text-white border-[#2D6A4F]'
+                            : 'bg-[#FEF9EE] text-[#925E14] border-[#F9DFAA]'
+                        }`}
+                      >
+                        {isApproved
+                          ? '✅ APPROVED BY MANAGER • FACTORY ORDER DISPATCHED'
+                          : '⏳ WAITING FOR VP MANAGER SIGNATURE'}
+                      </span>
+                      <span className="text-xs font-mono font-semibold text-[#1E4D38] bg-[#F2F8F4] px-2.5 py-0.5 rounded-lg border border-[#C3DFCD]">
+                        Request #{item.ticket_id}
+                      </span>
+                    </div>
 
-                  {/* A2A Metadata Pill Box */}
-                  <div className="flex flex-wrap items-center gap-3 text-[11px] font-mono text-slate-300 bg-slate-950/90 border border-slate-800 px-3 py-2 rounded-lg">
-                    <span className="flex items-center space-x-1">
-                      <Terminal className="h-3.5 w-3.5 text-teal-400" />
-                      <span className="text-slate-500">RemoteAgent:</span>
-                      <span className="text-teal-300">{item.agent_name}</span>
-                    </span>
-                    <span className="text-slate-700">|</span>
-                    <span>
-                      <span className="text-slate-500">Tool:</span>{' '}
-                      <span className="text-amber-300">{item.tool_invoked}</span>
-                    </span>
-                    <span className="text-slate-700">|</span>
-                    <span>
-                      <span className="text-slate-500">Card:</span>{' '}
-                      <span className="text-slate-400">{item.agent_card_url}</span>
-                    </span>
-                  </div>
-
-                  <p className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 p-2 rounded">
-                    {item.reason}
-                  </p>
-                </div>
-
-                <div className="flex flex-col items-end space-y-3 shrink-0">
-                  <div className="text-right">
-                    <span className="text-[10px] text-slate-400">Freight Expense</span>
-                    <p className="text-xl font-bold font-mono text-amber-400">${item.freight_cost.toLocaleString()}</p>
-                  </div>
-
-                  {!isApproved ? (
                     <div className="flex items-center space-x-2">
+                      <Factory className="h-5 w-5 text-[#B7791F] shrink-0" />
+                      <h3 className="font-serif text-base font-bold text-[#1C1917]">
+                        Restock {storeDisplay} &larr; {sourceDisplay}
+                      </h3>
+                    </div>
+
+                    <p className="text-xs text-[#44403C]">
+                      Product: <strong className="text-[#1C1917]">HydroBoost Electrolyte 12-Pack ({item.sku_id})</strong> • Quantity:{' '}
+                      <strong className="text-[#2D6A4F]">{item.units.toLocaleString()} packs</strong> • Carrier:{' '}
+                      <strong className="text-[#1C1917]">{item.carrier || 'HydroBoost Direct Cold-Chain Carrier'}</strong>
+                    </p>
+
+                    <div className="p-3.5 bg-[#FEF9EE] border border-[#F9DFAA] rounded-xl text-xs text-[#925E14] leading-relaxed">
+                      <strong>Why Manager Approval Is Needed (Math Check 4):</strong> {item.reason}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col lg:items-end justify-between space-y-4 shrink-0 bg-[#FAF7F2] p-4 rounded-xl border border-[#E6E0D3] min-w-[250px]">
+                    <div className="lg:text-right space-y-1">
+                      <span className="text-[11px] font-semibold text-[#78716C] block">
+                        Total Order Commitment (Product + Shipping)
+                      </span>
+                      <p className="font-serif text-2xl font-bold text-[#1C1917]">
+                        ${totalCommitment.toLocaleString()}
+                      </p>
+                      <span className="text-[11px] text-[#B7791F] font-semibold block">
+                        Includes ${freightVal.toLocaleString()} Express Cold-Chain Shipping
+                      </span>
+                    </div>
+
+                    {!isApproved ? (
                       <button
-                        onClick={() => handleApprove(item.event_id)}
+                        onClick={() => handleApproveClick(item.event_id)}
                         disabled={loadingItem === item.event_id}
-                        className="flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow transition disabled:opacity-50"
+                        className="w-full flex items-center justify-center space-x-2 bg-[#2D6A4F] hover:bg-[#1E4D38] text-white text-xs font-bold px-5 py-3 rounded-xl shadow-sm transition disabled:opacity-50 cursor-pointer"
                       >
                         <UserCheck className="h-4 w-4" />
                         <span>
                           {loadingItem === item.event_id
-                            ? 'Resuming RemoteA2aAgent...'
-                            : 'Approve & Resume A2A Agent'}
+                            ? 'Approving & Sending Order...'
+                            : 'Approve & Dispatch Order'}
                         </span>
                       </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center space-x-1.5 text-xs text-emerald-400 font-semibold bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 rounded-lg">
-                      <CheckCircle className="h-4 w-4" />
-                      <span>SAP Order #{sapOrder || 'STO-SAP-99215'} Dispatched</span>
-                    </div>
-                  )}
+                    ) : (
+                      <div className="w-full flex items-center justify-center space-x-1.5 text-xs text-[#1E4D38] font-bold bg-[#DFF0E5] border border-[#C3DFCD] px-4 py-2.5 rounded-xl">
+                        <CheckCircle2 className="h-4 w-4 text-[#2D6A4F]" />
+                        <span>Order #{sapOrder} Sent!</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

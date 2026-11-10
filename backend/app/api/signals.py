@@ -23,9 +23,9 @@ class AgentQueryRequest(BaseModel):
 
 @router.post("/ingest", response_model=ReplenishmentDecisionManifest)
 async def ingest_market_signal(event: MarketSignalEvent):
-    """Ingest POS scanner velocity, 25-day Weather API forecast, or Social Media signal and trigger deployed Vertex AI Agent Engine + 4-Rule Gate."""
+    """Ingest POS scanner velocity, 25-day Weather API forecast, or Social Media signal and trigger NexusTwin AI Multi-Agent System + 4-Rule Gate."""
     try:
-        manifest = await twin_service.ingest_market_signal(event)
+        manifest = await twin_service.ingest_market_signal(event, broadcast_fn=manager.broadcast)
         await manager.broadcast({
             "type": "SIGNAL_RESOLVED",
             "event_id": manifest.event_id,
@@ -68,9 +68,9 @@ async def list_demo_scenarios():
 
 @router.post("/scenario/{scenario_key}", response_model=ReplenishmentDecisionManifest)
 async def trigger_demo_scenario_endpoint(scenario_key: str):
-    """Trigger one of the 4 demo flows (shop1_pos_dc_replenish, shop2_dc_shortage_fmcg_po, shop3_weather_25day_prediction, shop4_social_media_event_spike) on Vertex AI Agent Engine."""
+    """Trigger one of the 4 demo flows (shop1_pos_dc_replenish, shop2_dc_shortage_fmcg_po, shop3_weather_25day_prediction, shop4_social_media_event_spike)."""
     try:
-        manifest = await twin_service.trigger_demo_scenario(scenario_key)
+        manifest = await twin_service.trigger_demo_scenario(scenario_key, broadcast_fn=manager.broadcast)
         await manager.broadcast({
             "type": "SIGNAL_RESOLVED",
             "scenario_key": scenario_key,

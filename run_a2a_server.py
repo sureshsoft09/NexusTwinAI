@@ -63,6 +63,12 @@ async def list_a2a_pending_tickets(request: Request) -> JSONResponse:
     return JSONResponse(list(A2A_PENDING_TICKETS.values()))
 
 
+async def reset_a2a_pending_tickets(request: Request) -> JSONResponse:
+    """Clear all in-memory pending A2A tickets on Demo Reset."""
+    A2A_PENDING_TICKETS.clear()
+    return JSONResponse({"status": "reset", "pending_count": 0})
+
+
 async def get_legacy_agent_json(request: Request) -> JSONResponse:
     """Alias `/.well-known/agent.json` to the live ADK A2A AgentCard route."""
     for route in app.routes:
@@ -78,6 +84,9 @@ async def forward_trailing_slash_rpc(request: Request):
     params = body.get("params", {}) if isinstance(body, dict) else {}
     if isinstance(params, dict) and "action" in params and "message" not in params:
         action = params.get("action")
+        if action == "reset":
+            A2A_PENDING_TICKETS.clear()
+            return JSONResponse({"jsonrpc": "2.0", "id": body.get("id", "1"), "result": {"status": "reset"}})
         purpose = params.get("purpose", "High-value replenishment / FMCG PO")
         amount = float(params.get("amount", 17672.0))
         sku_id = params.get("sku_id", "SKU-4089-HYDRATE")
@@ -112,6 +121,7 @@ async def forward_trailing_slash_rpc(request: Request):
 
 app.routes.extend([
     Route("/a2a/human_in_loop/pending", endpoint=list_a2a_pending_tickets, methods=["GET"]),
+    Route("/a2a/human_in_loop/reset", endpoint=reset_a2a_pending_tickets, methods=["POST"]),
     Route("/a2a/human_in_loop/.well-known/agent.json", endpoint=get_legacy_agent_json, methods=["GET"]),
     Route("/a2a/human_in_loop/", endpoint=forward_trailing_slash_rpc, methods=["POST"]),
 ])

@@ -226,6 +226,11 @@ class DigitalTwinService:
         self.pending_approvals.clear()
         self.audit_records = list(bq_lakehouse.audit_ledger)
         self.last_manifest = None
+        try:
+            with httpx.Client(timeout=2.0) as client:
+                client.post(f"{self.a2a_base_url}/", json={"id": "reset", "params": {"action": "reset"}})
+        except Exception:
+            pass
         return reset_summary
 
     async def query_remote_agent(
@@ -339,90 +344,195 @@ class DigitalTwinService:
                 "error": str(e),
             }
 
-    async def trigger_demo_scenario(self, scenario_key: str) -> ReplenishmentDecisionManifest:
-        """Trigger one of the 4 pre-configured enterprise demo scenarios against the deployed Vertex AI Agent Engine."""
+    async def trigger_demo_scenario(
+        self,
+        scenario_key: str,
+        broadcast_fn: Optional[Any] = None,
+    ) -> ReplenishmentDecisionManifest:
+        """Run live telemetry stream in Python -> fire Live Alert Notification -> trigger NexusTwin AI Multi-Agent System
+        -> produce Common Output -> run 4 Mandatory Mathematical Gate Checks -> execute final ERP / A2A workflow.
+        """
+        import asyncio
+
         payload = DEMO_SCENARIOS.get(scenario_key)
         if not payload:
             raise ValueError(f"Unknown scenario '{scenario_key}'. Valid: {list(DEMO_SCENARIOS.keys())}")
         event_fields = {k: v for k, v in payload.items() if k != "agent_prompt"}
         event = MarketSignalEvent(**event_fields)
-        return await self.ingest_market_signal(event, custom_prompt=payload.get("agent_prompt"))
+
+        store_id = event.store_id
+        sku_id = event.sku_id
+        store_friendly = {
+            "STORE-DAL-04": "Shop 1: Dallas Uptown (STORE-DAL-04)",
+            "STORE-HOU-05": "Shop 2: Houston Galleria (STORE-HOU-05)",
+            "STORE-PLANO-07": "Shop 3: Plano Legacy (STORE-PLANO-07)",
+            "STORE-ARL-11": "Shop 4: Arlington Stadium (STORE-ARL-11)",
+        }.get(store_id, store_id)
+
+        # 1. Stream 3 live POS / Weather / Social telemetry ticks from Python so the UI shows live data arriving
+        tick_sequences = {
+            "shop1_pos_dc_replenish": [
+                {"tick": 1, "velocity": 96.0, "on_hand": 340, "note": "POS Stream Tick #1: Checkout scans rising to 96 packs/hr (Shelf: 340 packs)"},
+                {"tick": 2, "velocity": 158.0, "on_hand": 240, "note": "POS Stream Tick #2: Checkout scans climbing to 158 packs/hr (Shelf: 240 packs)"},
+                {"tick": 3, "velocity": 215.0, "on_hand": 180, "note": "POS Stream Tick #3: CRITICAL 215 packs/hr (4.48x spike) • Shelf dropped to 180 packs (< 250 safety buffer)!"},
+            ],
+            "shop2_dc_shortage_fmcg_po": [
+                {"tick": 1, "velocity": 108.0, "on_hand": 320, "note": "POS Stream Tick #1: Houston Galleria checkout velocity rising to 108 packs/hr (Shelf: 320 packs)"},
+                {"tick": 2, "velocity": 174.0, "on_hand": 210, "note": "POS Stream Tick #2: Checkout velocity at 174 packs/hr (Shelf: 210 packs)"},
+                {"tick": 3, "velocity": 230.0, "on_hand": 140, "note": "POS Stream Tick #3: CRITICAL 230 packs/hr (4.42x spike) • Only 140 packs left & Houston DC has only 180 spare!"},
+            ],
+            "shop3_weather_25day_prediction": [
+                {"tick": 1, "velocity": 42.0, "on_hand": 520, "note": "Weather API Stream (Day 1–10): 81.5°F Normal • Store velocity 42 packs/hr"},
+                {"tick": 2, "velocity": 84.0, "on_hand": 520, "note": "Weather API Stream (Day 11–18): 96.0°F Heat Ridging • Projected demand climbing to 84 packs/hr"},
+                {"tick": 3, "velocity": 128.0, "on_hand": 520, "note": "Weather API Stream (Day 19–25): 104.2°F Extreme Heat Dome Detected! Projected velocity 128 packs/hr (+220% surge)!"},
+            ],
+            "shop4_social_media_event_spike": [
+                {"tick": 1, "velocity": 68.0, "on_hand": 420, "note": "Social Stream Tick #1: Reddit/X mentions rising (Buzz Score 62/100) near Arlington Stadium"},
+                {"tick": 2, "velocity": 115.0, "on_hand": 360, "note": "Social Stream Tick #2: Marathon registration posts trending (Buzz Score 84/100)"},
+                {"tick": 3, "velocity": 165.0, "on_hand": 310, "note": "Social Stream Tick #3: VIRAL ALERT (Score 94.5/100 • 18,500 Runners 1.2 mi away) • Velocity jumping to 165 packs/hr!"},
+            ],
+        }
+        ticks = tick_sequences.get(scenario_key, [])
+        for t in ticks:
+            if store_id in bq_lakehouse.inventory and sku_id in bq_lakehouse.inventory[store_id]:
+                bq_lakehouse.inventory[store_id][sku_id]["current_velocity"] = t["velocity"]
+                bq_lakehouse.inventory[store_id][sku_id]["on_hand"] = t["on_hand"]
+            if broadcast_fn:
+                await broadcast_fn({
+                    "type": "TELEMETRY_STREAM_TICK",
+                    "scenario_key": scenario_key,
+                    "store_id": store_id,
+                    "sku_id": sku_id,
+                    "tick": t["tick"],
+                    "total_ticks": len(ticks),
+                    "velocity": t["velocity"],
+                    "on_hand": t["on_hand"],
+                    "note": t["note"],
+                    "state": self.get_topology_state(),
+                })
+            await asyncio.sleep(0.45)
+
+        # 2. Threshold breached -> Broadcast Live Alert Notification before triggering Multi-Agent System
+        spike_ratio = round(event.observed_velocity / max(1.0, event.baseline_velocity), 2)
+        alert_msg = (
+            f"🚨 LIVE ALERT — {store_friendly}: Demand spiked to {event.observed_velocity:.0f} packs/hr "
+            f"({spike_ratio}x normal) with {event.current_store_stock} packs on shelf. "
+            f"Triggering NexusTwin AI Multi-Agent System..."
+        )
+        if broadcast_fn:
+            await broadcast_fn({
+                "type": "LIVE_ALERT_NOTIFICATION",
+                "scenario_key": scenario_key,
+                "event_id": event.event_id,
+                "store_id": store_id,
+                "alert_message": alert_msg,
+            })
+        await asyncio.sleep(0.4)
+
+        return await self.ingest_market_signal(
+            event,
+            custom_prompt=payload.get("agent_prompt"),
+            scenario_key=scenario_key,
+            broadcast_fn=broadcast_fn,
+        )
 
     async def get_pending_a2a_cards(self) -> List[Dict[str, Any]]:
-        """Fetch pending HITL approval cards from RemoteA2aAgent (Port 8001) + local twin queue."""
-        cards: List[Dict[str, Any]] = []
+        """Fetch deduplicated pending HITL approval cards from RemoteA2aAgent (Port 8001) + local twin queue."""
+        raw_cards: List[Dict[str, Any]] = []
         try:
             async with httpx.AsyncClient(timeout=2.5) as client:
                 resp = await client.get(f"{self.a2a_base_url}/pending")
                 if resp.status_code == 200:
                     data = resp.json()
                     if isinstance(data, list):
-                        cards.extend(data)
+                        raw_cards.extend(data)
                     elif isinstance(data, dict):
-                        cards.extend(data.get("pending_approvals", []))
+                        raw_cards.extend(data.get("pending_approvals", []))
         except Exception:
             pass
 
-        existing_ids = {c.get("event_id") or c.get("ticket_id") for c in cards}
         for event_id, item in self.pending_approvals.items():
-            if event_id not in existing_ids:
-                manifest = item.get("manifest", {})
-                order_type = manifest.get("order_type", "STO_FROM_DC")
-                prefix = "HITL-FMCG-PO" if order_type == "PO_TO_FMCG" else "HITL-STO"
-                cards.append(
-                    {
-                        "ticket_id": f"{prefix}-{manifest.get('target_store', 'HOU-05')}-{manifest.get('units_transferred', 1800)}",
-                        "event_id": event_id,
-                        "order_type": order_type,
-                        "agent_name": "approval_agent",
-                        "agent_card_url": f"{self.a2a_base_url}/.well-known/agent.json",
-                        "a2a_task_state": "input-required",
-                        "tool_invoked": "LongRunningFunctionTool(ask_for_approval)",
-                        "status": "pending",
-                        "store_id": manifest.get("target_store", "STORE-HOU-05"),
-                        "donor_dc": manifest.get("selected_donor_dc", "FMCG-PLANT-TX01 (via DC-HOU-01)"),
-                        "sku_id": manifest.get("sku_id", "SKU-4089-HYDRATE"),
-                        "units": manifest.get("units_transferred", 1800),
-                        "freight_cost": manifest.get("estimated_freight_cost", 1850.00),
-                        "fmcg_po_merchandise_cost": manifest.get("fmcg_po_merchandise_cost", 15822.00),
-                        "total_financial_commitment": manifest.get("total_financial_commitment", 17672.00),
-                        "freight_mode": manifest.get("freight_mode", "FMCG_DIRECT_EXPEDITED_PO"),
-                        "carrier": manifest.get("carrier_name", "HydroBoost Cold-Chain Direct Carrier (FMCG PO)"),
-                        "reason": (
-                            f"Serving DC (DC-HOU-01) lacked ATP stock (only 180 ATP vs 1,800 needed). "
-                            f"Escalated to External FMCG PO (${manifest.get('total_financial_commitment', 17672.0):,.2f} total commitment / "
-                            f"${manifest.get('estimated_freight_cost', 1850.0):,.2f} freight > $1,000 threshold). Handed over to RemoteA2aAgent."
-                            if order_type == "PO_TO_FMCG"
-                            else f"Freight cost (${manifest.get('estimated_freight_cost', 3500.0):,.2f}) exceeds $1,000 autonomy threshold. Handed over to RemoteA2aAgent."
-                        ),
-                        "created_at": manifest.get("created_at", "2026-11-06T12:45:00Z"),
-                    }
-                )
-        return cards
+            manifest = item.get("manifest", {})
+            order_type = manifest.get("order_type", "STO_FROM_DC")
+            prefix = "HITL-FMCG-PO" if order_type == "PO_TO_FMCG" else "HITL-STO"
+            raw_cards.append(
+                {
+                    "ticket_id": f"{prefix}-{manifest.get('target_store', 'HOU-05')}-{manifest.get('units_transferred', 1800)}",
+                    "event_id": event_id,
+                    "order_type": order_type,
+                    "agent_name": "approval_agent",
+                    "agent_card_url": f"{self.a2a_base_url}/.well-known/agent.json",
+                    "a2a_task_state": "input-required",
+                    "tool_invoked": "LongRunningFunctionTool(ask_for_approval)",
+                    "status": "pending",
+                    "store_id": manifest.get("target_store", "STORE-HOU-05"),
+                    "donor_dc": manifest.get("selected_donor_dc", "FMCG-PLANT-TX01 (via DC-HOU-01)"),
+                    "sku_id": manifest.get("sku_id", "SKU-4089-HYDRATE"),
+                    "units": manifest.get("units_transferred", 1800),
+                    "freight_cost": manifest.get("estimated_freight_cost", 1850.00),
+                    "fmcg_po_merchandise_cost": manifest.get("fmcg_po_merchandise_cost", 15822.00),
+                    "total_financial_commitment": manifest.get("total_financial_commitment", 17672.00),
+                    "freight_mode": manifest.get("freight_mode", "FMCG_DIRECT_EXPEDITED_PO"),
+                    "carrier": manifest.get("carrier_name", "HydroBoost Cold-Chain Direct Carrier (FMCG PO)"),
+                    "reason": (
+                        f"Serving DC (DC-HOU-01) lacked ATP stock (only 180 ATP vs 1,800 needed). "
+                        f"Escalated to External FMCG PO (${manifest.get('total_financial_commitment', 17672.0):,.2f} total commitment / "
+                        f"${manifest.get('estimated_freight_cost', 1850.0):,.2f} freight > $1,000 threshold). Handed over to RemoteA2aAgent."
+                        if order_type == "PO_TO_FMCG"
+                        else f"Freight cost (${manifest.get('estimated_freight_cost', 3500.0):,.2f}) exceeds $1,000 autonomy threshold. Handed over to RemoteA2aAgent."
+                    ),
+                    "created_at": manifest.get("created_at", "2026-11-06T12:45:00Z"),
+                }
+            )
+
+        # Deduplicate by (store_id, sku_id) keeping the latest card so Header & Tab 5 counts always match
+        deduped_by_store: Dict[str, Dict[str, Any]] = {}
+        for card in raw_cards:
+            store_key = f"{card.get('store_id', 'STORE-HOU-05')}_{card.get('sku_id', 'SKU-4089-HYDRATE')}"
+            normalized = dict(card)
+            normalized["carrier"] = normalized.get("carrier") or normalized.get("carrier_name") or "HydroBoost Direct Cold-Chain Carrier"
+            normalized["created_at"] = normalized.get("created_at") or normalized.get("timestamp") or "2026-11-06T12:45:00Z"
+            deduped_by_store[store_key] = normalized
+
+        return list(deduped_by_store.values())
 
     async def ingest_market_signal(
         self,
         event: MarketSignalEvent,
         custom_prompt: Optional[str] = None,
+        scenario_key: Optional[str] = None,
+        broadcast_fn: Optional[Any] = None,
     ) -> ReplenishmentDecisionManifest:
-        """Invoke the deployed Vertex AI Agent Engine (`reasoningEngines/6418419193229606912`)
-        and deterministic 4-Rule Feasibility Gate for inbound POS, Weather 25d, or Social Media signal.
+        """Invoke the NexusTwin AI Multi-Agent System (`sensing_agent` -> `replenishment_agent` -> `logistics_agent`),
+        produce the Standardized Common Multi-Agent Output (`MultiAgentCommonOutput`),
+        evaluate the 4 Mandatory Mathematical Gate Checks, and execute the final ERP / A2A workflow.
         """
+        import asyncio
+
         has_approval = (
             event.event_id in self.pending_approvals
             and self.pending_approvals[event.event_id].get("approved", False)
         )
         approver_token = self.pending_approvals.get(event.event_id, {}).get("approver_token")
 
-        # 1. Build prompt for Vertex AI Agent Engine
+        if broadcast_fn:
+            await broadcast_fn({
+                "type": "MULTI_AGENT_PROCESSING",
+                "event_id": event.event_id,
+                "scenario_key": scenario_key,
+                "active_agent": "sensing_agent",
+                "status_message": "NexusTwin AI Multi-Agent System Running: sensing_agent querying BigQuery Lakehouse & telemetry streams...",
+            })
+
+        # 1. Build prompt for NexusTwin AI Multi-Agent System
         prompt = custom_prompt or (
             f"Market signal `{event.event_id}` from `{event.signal_source}` at store `{event.store_id}` for SKU `{event.sku_id}`: "
             f"observed velocity {event.observed_velocity} units/hr (baseline {event.baseline_velocity} u/hr), "
             f"current store stock {event.current_store_stock} units, forecast horizon {event.forecast_horizon_days} days. "
-            f"Context: {event.context_notes or 'Evaluate sensing, DC ATP replenishment, logistics rates, and 4-Rule Feasibility Gate.'}"
+            f"Context: {event.context_notes or 'Evaluate sensing, DC ATP replenishment, supplier negotiation, logistics rates, and 4-Rule Feasibility Gate.'}"
         )
 
-        # 2. Query deployed Vertex AI Agent Engine (`projects/311231946335/locations/us-central1/reasoningEngines/6418419193229606912`)
+        # 2. Query deployed NexusTwin AI Agent Engine (`projects/311231946335/locations/us-central1/reasoningEngines/6418419193229606912`)
         remote_res = await self.query_remote_agent(
             prompt=prompt,
             user_id=f"store_manager_{event.store_id.lower()}",
@@ -434,12 +544,43 @@ class DigitalTwinService:
             },
         )
 
-        # 3. Run deterministic multi-agent supervisor & 4-Rule Feasibility Gate to guarantee exact ERP/BQ schema contract
+        if broadcast_fn:
+            await broadcast_fn({
+                "type": "MULTI_AGENT_PROCESSING",
+                "event_id": event.event_id,
+                "scenario_key": scenario_key,
+                "active_agent": "replenishment_agent",
+                "status_message": "replenishment_agent checking SAP ERP warehouse stock & negotiating supplier terms + logistics_agent quoting 3PL carrier lanes...",
+            })
+            await asyncio.sleep(0.35)
+
+        # 3. Run multi-agent supervisor -> produces `common_agent_output` -> runs 4 Mandatory Mathematical Gate Checks
         manifest = await self.supervisor.run_resolution_cycle(
             event=event,
             has_human_approval=has_approval,
             approver_token=approver_token,
+            scenario_key=scenario_key,
         )
+
+        # Broadcast Common Multi-Agent Output Ready before Gate Check confirmation
+        if broadcast_fn and manifest.common_agent_output:
+            await broadcast_fn({
+                "type": "COMMON_AGENT_OUTPUT_READY",
+                "event_id": manifest.event_id,
+                "scenario_key": scenario_key,
+                "common_agent_output": manifest.common_agent_output.model_dump(mode="json"),
+            })
+            await asyncio.sleep(0.55)
+
+        # Broadcast 4 Mandatory Mathematical Gate Checks Evaluated
+        if broadcast_fn and manifest.gate_evaluation:
+            await broadcast_fn({
+                "type": "GATE_CHECKS_EVALUATED",
+                "event_id": manifest.event_id,
+                "scenario_key": scenario_key,
+                "gate_evaluation": manifest.gate_evaluation.model_dump(mode="json"),
+            })
+            await asyncio.sleep(0.45)
 
         # 4. Merge live Vertex AI Agent Engine output & order IDs into the manifest
         manifest.agent_engine_resource_id = self.agent_engine_resource_id
@@ -617,6 +758,9 @@ class DigitalTwinService:
 
             if req.approved:
                 self.pending_approvals.pop(req.event_id, None)
+                for k in list(self.pending_approvals.keys()):
+                    if self.pending_approvals[k].get("manifest", {}).get("target_store") == manifest.target_store:
+                        self.pending_approvals.pop(k, None)
                 self._apply_inventory_change(manifest)
 
             audit_entry = {
