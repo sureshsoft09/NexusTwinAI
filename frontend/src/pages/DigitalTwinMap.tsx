@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { apiUrl, wsUrl } from '../apiConfig';
 import {
   CheckCircle2,
   Factory,
@@ -76,9 +77,7 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
   useEffect(() => {
     let ws: WebSocket | null = null;
     try {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/api/v1/twin/ws/telemetry`;
-      ws = new WebSocket(wsUrl);
+      ws = new WebSocket(wsUrl('/api/v1/twin/ws/telemetry'));
 
       ws.onmessage = (ev) => {
         try {
@@ -152,7 +151,7 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
     setAgentStatusMsg('Waiting for telemetry threshold breach...');
 
     try {
-      const res = await fetch(`/api/v1/signals/scenario/${scenarioKey}`, {
+      const res = await fetch(apiUrl(`/api/v1/signals/scenario/${scenarioKey}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -161,7 +160,7 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
         setLastDecision(manifest);
 
         // Sync inventory from backend after resolution
-        const stateRes = await fetch('/api/v1/twin/state');
+        const stateRes = await fetch(apiUrl('/api/v1/twin/state'));
         if (stateRes.ok) {
           const stateData = await stateRes.json();
           if (stateData.inventory) {
@@ -245,18 +244,18 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
 
   return (
     <div className="h-full flex flex-col p-5 space-y-4 overflow-y-auto">
-      {/* 1. Scenario Stream Launcher Bar (VITRINE Editorial Card) */}
-      <div className="bg-white border border-[#E6E0D3] rounded-2xl p-4 shadow-enterprise flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+      {/* 1. Scenario Stream Launcher Bar (Retail Cerulean & Alabaster Pearl Card) */}
+      <div className="bg-white border border-[#DCE4EE] rounded-2xl p-4 shadow-enterprise flex flex-col xl:flex-row xl:items-center justify-between gap-3">
         <div>
           <div className="flex items-center space-x-2">
-            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-[#F2F8F4] text-[#2D6A4F] border border-[#C3DFCD] uppercase tracking-wider">
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-[#ECF5FC] text-[#0E5A8A] border border-[#C2DFF3] uppercase tracking-wider">
               Live Telemetry Streamer
             </span>
-            <h1 className="font-serif text-sm sm:text-base font-bold text-[#1C1917]">
+            <h1 className="font-serif text-sm sm:text-base font-bold text-[#14213D]">
               Start a Live Store Telemetry Stream to Trigger NexusTwin AI Multi-Agent System
             </h1>
           </div>
-          <p className="text-xs text-[#78716C] mt-0.5">
+          <p className="text-xs text-[#526582] mt-0.5">
             Run any scenario below (then click <strong>Reset Demo Stock</strong> in the top bar to reset BigQuery and run the next scenario):
           </p>
         </div>
@@ -267,14 +266,14 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
             disabled={isRunning}
             className={`flex items-center space-x-2 text-left text-xs px-3 py-2 rounded-xl border font-semibold transition cursor-pointer disabled:opacity-60 ${
               activeScenario === 'shop1_pos_dc_replenish'
-                ? 'bg-[#2D6A4F] border-[#2D6A4F] text-white shadow-sm'
-                : 'bg-[#FAF7F2] border-[#E6E0D3] text-[#1C1917] hover:bg-[#F2F8F4] hover:border-[#C3DFCD]'
+                ? 'bg-[#0E5A8A] border-[#0E5A8A] text-white shadow-sm'
+                : 'bg-[#F5F8FC] border-[#DCE4EE] text-[#14213D] hover:bg-[#ECF5FC] hover:border-[#C2DFF3]'
             }`}
           >
-            <Zap className={`h-4 w-4 shrink-0 ${activeScenario === 'shop1_pos_dc_replenish' ? 'text-[#FDF0D5]' : 'text-[#2D6A4F]'}`} />
+            <Zap className={`h-4 w-4 shrink-0 ${activeScenario === 'shop1_pos_dc_replenish' ? 'text-[#FEF3C7]' : 'text-[#0E5A8A]'}`} />
             <div>
               <div className="font-bold">1. Run Shop 1 POS Stream</div>
-              <div className={`text-[10px] ${activeScenario === 'shop1_pos_dc_replenish' ? 'text-[#DFF0E5]' : 'text-[#78716C]'}`}>
+              <div className={`text-[10px] ${activeScenario === 'shop1_pos_dc_replenish' ? 'text-[#D6EAF8]' : 'text-[#526582]'}`}>
                 Dallas Checkout Surge
               </div>
             </div>
@@ -285,14 +284,14 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
             disabled={isRunning}
             className={`flex items-center space-x-2 text-left text-xs px-3 py-2 rounded-xl border font-semibold transition cursor-pointer disabled:opacity-60 ${
               activeScenario === 'shop2_dc_shortage_fmcg_po'
-                ? 'bg-[#B7791F] border-[#B7791F] text-white shadow-sm'
-                : 'bg-[#FAF7F2] border-[#E6E0D3] text-[#1C1917] hover:bg-[#FEF9EE] hover:border-[#F9DFAA]'
+                ? 'bg-[#C27803] border-[#C27803] text-white shadow-sm'
+                : 'bg-[#F5F8FC] border-[#DCE4EE] text-[#14213D] hover:bg-[#FFFBEB] hover:border-[#FDE68A]'
             }`}
           >
-            <Factory className={`h-4 w-4 shrink-0 ${activeScenario === 'shop2_dc_shortage_fmcg_po' ? 'text-white' : 'text-[#B7791F]'}`} />
+            <Factory className={`h-4 w-4 shrink-0 ${activeScenario === 'shop2_dc_shortage_fmcg_po' ? 'text-white' : 'text-[#C27803]'}`} />
             <div>
               <div className="font-bold">2. Run Shop 2 POS Stream</div>
-              <div className={`text-[10px] ${activeScenario === 'shop2_dc_shortage_fmcg_po' ? 'text-[#FDF0D5]' : 'text-[#78716C]'}`}>
+              <div className={`text-[10px] ${activeScenario === 'shop2_dc_shortage_fmcg_po' ? 'text-[#FEF3C7]' : 'text-[#526582]'}`}>
                 DC Shortage &rarr; Factory PO
               </div>
             </div>
@@ -303,14 +302,14 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
             disabled={isRunning}
             className={`flex items-center space-x-2 text-left text-xs px-3 py-2 rounded-xl border font-semibold transition cursor-pointer disabled:opacity-60 ${
               activeScenario === 'shop3_weather_25day_prediction'
-                ? 'bg-[#B54834] border-[#B54834] text-white shadow-sm'
-                : 'bg-[#FAF7F2] border-[#E6E0D3] text-[#1C1917] hover:bg-[#FDF3F1] hover:border-[#F5C7BD]'
+                ? 'bg-[#C93B2B] border-[#C93B2B] text-white shadow-sm'
+                : 'bg-[#F5F8FC] border-[#DCE4EE] text-[#14213D] hover:bg-[#FDF2F2] hover:border-[#F8CACA]'
             }`}
           >
-            <CloudSun className={`h-4 w-4 shrink-0 ${activeScenario === 'shop3_weather_25day_prediction' ? 'text-[#FDF0D5]' : 'text-[#B54834]'}`} />
+            <CloudSun className={`h-4 w-4 shrink-0 ${activeScenario === 'shop3_weather_25day_prediction' ? 'text-[#FEF3C7]' : 'text-[#C93B2B]'}`} />
             <div>
               <div className="font-bold">3. Run 25d Weather Stream</div>
-              <div className={`text-[10px] ${activeScenario === 'shop3_weather_25day_prediction' ? 'text-[#FBE4DF]' : 'text-[#78716C]'}`}>
+              <div className={`text-[10px] ${activeScenario === 'shop3_weather_25day_prediction' ? 'text-[#FCE4E4]' : 'text-[#526582]'}`}>
                 Plano 104°F Heatwave
               </div>
             </div>
@@ -321,14 +320,14 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
             disabled={isRunning}
             className={`flex items-center space-x-2 text-left text-xs px-3 py-2 rounded-xl border font-semibold transition cursor-pointer disabled:opacity-60 ${
               activeScenario === 'shop4_social_media_event_spike'
-                ? 'bg-[#7B2D53] border-[#7B2D53] text-white shadow-sm'
-                : 'bg-[#FAF7F2] border-[#E6E0D3] text-[#1C1917] hover:bg-[#FCF3F7] hover:border-[#EEC4D8]'
+                ? 'bg-[#6D28D9] border-[#6D28D9] text-white shadow-sm'
+                : 'bg-[#F5F8FC] border-[#DCE4EE] text-[#14213D] hover:bg-[#F5F3FF] hover:border-[#DDD6FE]'
             }`}
           >
-            <Users className={`h-4 w-4 shrink-0 ${activeScenario === 'shop4_social_media_event_spike' ? 'text-[#F7E1EC]' : 'text-[#7B2D53]'}`} />
+            <Users className={`h-4 w-4 shrink-0 ${activeScenario === 'shop4_social_media_event_spike' ? 'text-[#EDE9FE]' : 'text-[#6D28D9]'}`} />
             <div>
               <div className="font-bold">4. Run Social Event Stream</div>
-              <div className={`text-[10px] ${activeScenario === 'shop4_social_media_event_spike' ? 'text-[#F7E1EC]' : 'text-[#78716C]'}`}>
+              <div className={`text-[10px] ${activeScenario === 'shop4_social_media_event_spike' ? 'text-[#EDE9FE]' : 'text-[#526582]'}`}>
                 Arlington 18.5k Marathon
               </div>
             </div>
@@ -341,14 +340,14 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
         <div
           className={`rounded-2xl p-3.5 border shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all ${
             liveAlertBanner
-              ? 'bg-[#FDF3F1] border-[#F5C7BD] text-[#8F3624]'
-              : 'bg-[#F2F8F4] border-[#C3DFCD] text-[#1E4D38]'
+              ? 'bg-[#FDF2F2] border-[#F8CACA] text-[#9E2B1E]'
+              : 'bg-[#ECF5FC] border-[#C2DFF3] text-[#094266]'
           }`}
         >
           <div className="flex items-center space-x-3">
             <div
               className={`p-2 rounded-xl text-white shrink-0 ${
-                liveAlertBanner ? 'bg-[#B54834] animate-pulse' : 'bg-[#2D6A4F]'
+                liveAlertBanner ? 'bg-[#C93B2B] animate-pulse' : 'bg-[#0E5A8A]'
               }`}
             >
               {liveAlertBanner ? <BellRing className="h-4 w-4" /> : <Radio className="h-4 w-4 animate-spin" />}
@@ -358,7 +357,7 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
                 {liveAlertBanner || telemetryTickNote}
               </div>
               {telemetryTickNote && liveAlertBanner && (
-                <div className="text-[11px] text-[#B54834] mt-0.5 font-medium">
+                <div className="text-[11px] text-[#C93B2B] mt-0.5 font-medium">
                   Latest Telemetry Packet: {telemetryTickNote}
                 </div>
               )}
@@ -366,8 +365,8 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
           </div>
 
           {isRunning && (
-            <div className="flex items-center space-x-2 text-xs font-bold bg-white px-3 py-1.5 rounded-xl border border-[#E6E0D3] text-[#1E4D38] shrink-0">
-              <Loader2 className="h-4 w-4 animate-spin text-[#2D6A4F]" />
+            <div className="flex items-center space-x-2 text-xs font-bold bg-white px-3 py-1.5 rounded-xl border border-[#DCE4EE] text-[#094266] shrink-0">
+              <Loader2 className="h-4 w-4 animate-spin text-[#0E5A8A]" />
               <span>NexusTwin AI Multi-Agent System Active...</span>
             </div>
           )}
@@ -377,62 +376,62 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
       {/* 3. Parallel Synchronized Grid: 3-Tier Map (Left 7 Cols) + Multi-Agent & 4 Math Checks (Right 5 Cols) */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 flex-1">
         {/* LEFT COLUMN (7 Cols): Live 3-Tier Supply Chain Network Map */}
-        <div className="xl:col-span-7 bg-white border border-[#E6E0D3] rounded-2xl p-4 shadow-enterprise flex flex-col justify-between space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#E6E0D3] pb-2.5">
+        <div className="xl:col-span-7 bg-white border border-[#DCE4EE] rounded-2xl p-4 shadow-enterprise flex flex-col justify-between space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#DCE4EE] pb-2.5">
             <div>
-              <h2 className="font-serif text-sm font-bold text-[#1C1917]">
+              <h2 className="font-serif text-sm font-bold text-[#14213D]">
                 Live 3-Tier Supply Chain Network Map (Factory &rarr; Warehouses &rarr; Retail Stores)
               </h2>
-              <p className="text-[11px] text-[#78716C]">
+              <p className="text-[11px] text-[#526582]">
                 {phase === 'IDLE'
                   ? 'All 6 retail stores operating at healthy baseline stock. Start a scenario stream above to watch a live spike.'
                   : `Live Scenario Active on ${targetStoreId} • Current Phase: ${phase.replace(/_/g, ' ')}`}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-3 text-[11px] font-semibold">
-              <span className="flex items-center space-x-1.5 text-[#1E4D38]">
-                <span className="h-2.5 w-2.5 rounded-full bg-[#2D6A4F] inline-block" />
+              <span className="flex items-center space-x-1.5 text-[#095C47]">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#0D7A5F] inline-block" />
                 <span>Warehouse Transfer</span>
               </span>
-              <span className="flex items-center space-x-1.5 text-[#925E14]">
-                <span className="h-2.5 w-2.5 rounded-full bg-[#B7791F] inline-block" />
+              <span className="flex items-center space-x-1.5 text-[#925802]">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#C27803] inline-block" />
                 <span>Factory PO Escalation</span>
               </span>
-              <span className="flex items-center space-x-1.5 text-[#8F3624]">
-                <span className="h-2.5 w-2.5 rounded-full bg-[#B54834] inline-block" />
+              <span className="flex items-center space-x-1.5 text-[#9E2B1E]">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#C93B2B] inline-block" />
                 <span>Store Spike Alert</span>
               </span>
             </div>
           </div>
 
-          {/* Interactive SVG Network Flow Diagram with Warm Editorial Swimlane Tier Headers */}
-          <div className="w-full bg-[#FAF7F2] border border-[#E6E0D3] rounded-2xl p-2.5 overflow-x-auto">
+          {/* Interactive SVG Network Flow Diagram with Retail Swimlane Tier Headers */}
+          <div className="w-full bg-[#F5F8FC] border border-[#DCE4EE] rounded-2xl p-2.5 overflow-x-auto">
             <svg viewBox="0 0 920 410" className="w-full h-auto min-w-[660px] select-none">
               <defs>
-                <marker id="arrow-sage" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
-                  <path d="M0,0 L8,4 L0,8 Z" fill="#2D6A4F" />
+                <marker id="arrow-mint" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+                  <path d="M0,0 L8,4 L0,8 Z" fill="#0D7A5F" />
                 </marker>
-                <marker id="arrow-gold" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
-                  <path d="M0,0 L8,4 L0,8 Z" fill="#B7791F" />
+                <marker id="arrow-amber" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+                  <path d="M0,0 L8,4 L0,8 Z" fill="#C27803" />
                 </marker>
               </defs>
 
               {/* Swimlane Background Bands & Dedicated Non-Overlapping Tier Header Pills */}
-              <rect x="8" y="6" width="904" height="98" rx="12" fill="#FEF9EE" fillOpacity="0.85" stroke="#F9DFAA" strokeWidth="1" />
-              <rect x="16" y="12" width="248" height="20" rx="6" fill="#FDF0D5" stroke="#D99B26" strokeWidth="1" />
-              <text x="26" y="25.5" className="text-[10px] font-bold fill-[#925E14] uppercase tracking-wider">
+              <rect x="8" y="6" width="904" height="98" rx="12" fill="#FFFBEB" fillOpacity="0.85" stroke="#FDE68A" strokeWidth="1" />
+              <rect x="16" y="12" width="248" height="20" rx="6" fill="#FEF3C7" stroke="#D97706" strokeWidth="1" />
+              <text x="26" y="25.5" className="text-[10px] font-bold fill-[#925802] uppercase tracking-wider">
                 TIER 1: UPSTREAM BOTTLING FACTORY
               </text>
 
-              <rect x="8" y="132" width="904" height="106" rx="12" fill="#F2F8F4" fillOpacity="0.85" stroke="#C3DFCD" strokeWidth="1" />
-              <rect x="16" y="138" width="272" height="20" rx="6" fill="#DFF0E5" stroke="#2D6A4F" strokeWidth="1" />
-              <text x="26" y="151.5" className="text-[10px] font-bold fill-[#1E4D38] uppercase tracking-wider">
+              <rect x="8" y="132" width="904" height="106" rx="12" fill="#ECF5FC" fillOpacity="0.85" stroke="#C2DFF3" strokeWidth="1" />
+              <rect x="16" y="138" width="272" height="20" rx="6" fill="#D6EAF8" stroke="#0E5A8A" strokeWidth="1" />
+              <text x="26" y="151.5" className="text-[10px] font-bold fill-[#094266] uppercase tracking-wider">
                 TIER 2: REGIONAL WAREHOUSES (3 DCs)
               </text>
 
-              <rect x="8" y="268" width="904" height="134" rx="12" fill="#F7F3EB" stroke="#E6E0D3" strokeWidth="1" />
-              <rect x="16" y="274" width="250" height="20" rx="6" fill="#EAE4D7" stroke="#B8AD96" strokeWidth="1" />
-              <text x="26" y="287.5" className="text-[10px] font-bold fill-[#1C1917] uppercase tracking-wider">
+              <rect x="8" y="268" width="904" height="134" rx="12" fill="#EBF1F8" fillOpacity="0.7" stroke="#DCE4EE" strokeWidth="1" />
+              <rect x="16" y="274" width="250" height="20" rx="6" fill="#DCE4EE" stroke="#9BB0C9" strokeWidth="1" />
+              <text x="26" y="287.5" className="text-[10px] font-bold fill-[#14213D] uppercase tracking-wider">
                 TIER 3: RETAIL STORES (6 TEXAS SHOPS)
               </text>
 
@@ -444,16 +443,16 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
                     <path
                       d={`M ${factoryPos.x} ${factoryPos.y + 26} C ${factoryPos.x} 125, ${dcPos.x} 125, ${dcPos.x} ${dcPos.y - 30}`}
                       fill="none"
-                      stroke={isFactoryActiveLink ? '#B7791F' : '#D4CBB8'}
+                      stroke={isFactoryActiveLink ? '#C27803' : '#C4D0E0'}
                       strokeWidth={isFactoryActiveLink ? 4 : 1.5}
                       strokeDasharray={isFactoryActiveLink ? undefined : '4 4'}
                       className={isFactoryActiveLink ? 'animate-flow-line' : ''}
-                      markerEnd={isFactoryActiveLink ? 'url(#arrow-gold)' : undefined}
+                      markerEnd={isFactoryActiveLink ? 'url(#arrow-amber)' : undefined}
                     />
                     {isFactoryActiveLink && (
                       <g transform={`translate(${(factoryPos.x + dcPos.x) / 2 - 84}, 108)`}>
-                        <rect width="168" height="21" rx="10" fill="#FEF9EE" stroke="#B7791F" strokeWidth="1.5" />
-                        <text x="84" y="14" textAnchor="middle" className="text-[10px] font-bold fill-[#925E14]">
+                        <rect width="168" height="21" rx="10" fill="#FFFBEB" stroke="#C27803" strokeWidth="1.5" />
+                        <text x="84" y="14" textAnchor="middle" className="text-[10px] font-bold fill-[#925802]">
                           Factory PO: 1,800 Packs ($8.79)
                         </text>
                       </g>
@@ -468,9 +467,9 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
                 const isActiveTarget = hasCommonOutput && targetStoreId === storeId;
                 const strokeColor = isActiveTarget
                   ? isFactoryPO
-                    ? '#B7791F'
-                    : '#2D6A4F'
-                  : '#D4CBB8';
+                    ? '#C27803'
+                    : '#0D7A5F'
+                  : '#C4D0E0';
 
                 return (
                   <g key={`dc-store-${storeId}`}>
@@ -483,8 +482,8 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
                       markerEnd={
                         isActiveTarget
                           ? isFactoryPO
-                            ? 'url(#arrow-gold)'
-                            : 'url(#arrow-sage)'
+                            ? 'url(#arrow-amber)'
+                            : 'url(#arrow-mint)'
                           : undefined
                       }
                     />
@@ -494,15 +493,15 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
                           width="144"
                           height="21"
                           rx="10"
-                          fill={isFactoryPO ? '#FEF9EE' : '#F2F8F4'}
-                          stroke={isFactoryPO ? '#B7791F' : '#2D6A4F'}
+                          fill={isFactoryPO ? '#FFFBEB' : '#EEFBF6'}
+                          stroke={isFactoryPO ? '#C27803' : '#0D7A5F'}
                           strokeWidth="1.5"
                         />
                         <text
                           x="72"
                           y="14"
                           textAnchor="middle"
-                          className={`text-[10px] font-bold ${isFactoryPO ? 'fill-[#925E14]' : 'fill-[#1E4D38]'}`}
+                          className={`text-[10px] font-bold ${isFactoryPO ? 'fill-[#925802]' : 'fill-[#095C47]'}`}
                         >
                           🚚 +{unitsTransferred.toLocaleString()} Packs (${freightCost})
                         </text>
@@ -522,18 +521,18 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
                   width="280"
                   height="50"
                   rx="12"
-                  fill={hasCommonOutput && isFactoryPO ? '#FEF9EE' : '#FFFFFF'}
-                  stroke={hasCommonOutput && isFactoryPO ? '#B7791F' : '#D4CBB8'}
+                  fill={hasCommonOutput && isFactoryPO ? '#FFFBEB' : '#FFFFFF'}
+                  stroke={hasCommonOutput && isFactoryPO ? '#C27803' : '#9BB0C9'}
                   strokeWidth={hasCommonOutput && isFactoryPO ? 3 : 1.75}
                 />
-                <circle cx="26" cy="25" r="15" fill={hasCommonOutput && isFactoryPO ? '#B7791F' : '#FDF0D5'} />
+                <circle cx="26" cy="25" r="15" fill={hasCommonOutput && isFactoryPO ? '#C27803' : '#FEF3C7'} />
                 <text x="26" y="30" textAnchor="middle" className="text-sm">
                   🏭
                 </text>
-                <text x="50" y="21" className="text-[12px] font-bold fill-[#1C1917]">
+                <text x="50" y="21" className="text-[12px] font-bold fill-[#14213D]">
                   Waco Bottling Factory (Manufacturer)
                 </text>
-                <text x="50" y="37" className="text-[10px] font-bold fill-[#2D6A4F]">
+                <text x="50" y="37" className="text-[10px] font-bold fill-[#0D7A5F]">
                   Spare Stock: {factorySpare.toLocaleString()} packs ($8.79/pack wholesale)
                 </text>
               </g>
@@ -555,23 +554,23 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
                       width="216"
                       height="58"
                       rx="12"
-                      fill={isLow && activeScenario === 'shop2_dc_shortage_fmcg_po' ? '#FDF3F1' : isActiveDc ? '#F2F8F4' : '#FFFFFF'}
-                      stroke={isLow && activeScenario === 'shop2_dc_shortage_fmcg_po' ? '#B54834' : isActiveDc ? '#2D6A4F' : '#D4CBB8'}
+                      fill={isLow && activeScenario === 'shop2_dc_shortage_fmcg_po' ? '#FDF2F2' : isActiveDc ? '#EEFBF6' : '#FFFFFF'}
+                      stroke={isLow && activeScenario === 'shop2_dc_shortage_fmcg_po' ? '#C93B2B' : isActiveDc ? '#0D7A5F' : '#9BB0C9'}
                       strokeWidth={isActiveDc || (isLow && activeScenario === 'shop2_dc_shortage_fmcg_po') ? 2.75 : 1.5}
                     />
-                    <text x="14" y="21" className="text-[12px] font-bold fill-[#1C1917]">
+                    <text x="14" y="21" className="text-[12px] font-bold fill-[#14213D]">
                       🏢 {dcPos.shortName}
                     </text>
                     <text
                       x="14"
                       y="38"
-                      className={`text-[11px] font-bold ${isLow ? 'fill-[#B7791F]' : 'fill-[#2D6A4F]'}`}
+                      className={`text-[11px] font-bold ${isLow ? 'fill-[#C27803]' : 'fill-[#0D7A5F]'}`}
                     >
                       {isLow
                         ? `⚠️ Only ${dcInv.atp_surplus} Spare Packs`
                         : `✅ ${dcInv.atp_surplus.toLocaleString()} Spare Packs`}
                     </text>
-                    <text x="14" y="51" className="text-[9px] font-medium fill-[#78716C]">
+                    <text x="14" y="51" className="text-[9px] font-medium fill-[#526582]">
                       On-Hand: {dcInv.on_hand.toLocaleString()} • Reserve: {dcInv.safety_buffer.toLocaleString()}
                     </text>
                   </g>
@@ -604,7 +603,7 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
                         height="80"
                         rx="14"
                         fill="none"
-                        stroke="#B54834"
+                        stroke="#C93B2B"
                         strokeWidth="2.5"
                         strokeDasharray="5 3"
                       />
@@ -613,34 +612,34 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
                       width="132"
                       height="72"
                       rx="11"
-                      fill={isActiveSpikeStore ? '#FDF3F1' : '#FFFFFF'}
-                      stroke={isActiveSpikeStore ? '#B54834' : '#D4CBB8'}
+                      fill={isActiveSpikeStore ? '#FDF2F2' : '#FFFFFF'}
+                      stroke={isActiveSpikeStore ? '#C93B2B' : '#9BB0C9'}
                       strokeWidth={isActiveSpikeStore ? 2.5 : 1.5}
                     />
-                    <text x="66" y="19" textAnchor="middle" className="text-[11px] font-bold fill-[#1C1917]">
+                    <text x="66" y="19" textAnchor="middle" className="text-[11px] font-bold fill-[#14213D]">
                       🏪 {stPos.shopLabel}
                     </text>
                     <text
                       x="66"
                       y="35"
                       textAnchor="middle"
-                      className={`text-[10px] font-bold ${isActiveSpikeStore ? 'fill-[#B54834]' : 'fill-[#2D6A4F]'}`}
+                      className={`text-[10px] font-bold ${isActiveSpikeStore ? 'fill-[#C93B2B]' : 'fill-[#0D7A5F]'}`}
                     >
                       {isActiveSpikeStore ? `🔥 ${vel}/hr Spike!` : `Normal (${vel}/hr)`}
                     </text>
-                    <text x="66" y="50" textAnchor="middle" className="text-[10px] font-semibold fill-[#44403C]">
+                    <text x="66" y="50" textAnchor="middle" className="text-[10px] font-semibold fill-[#3B4E6B]">
                       Shelf: {stInv.on_hand} packs
                     </text>
                     {isCompleted && isActiveSpikeStore && !isFactoryPO ? (
-                      <text x="66" y="64" textAnchor="middle" className="text-[9px] font-bold fill-[#2D6A4F]">
+                      <text x="66" y="64" textAnchor="middle" className="text-[9px] font-bold fill-[#0D7A5F]">
                         +{unitsTransferred} Dispatched
                       </text>
                     ) : isCompleted && isActiveSpikeStore && isFactoryPO ? (
-                      <text x="66" y="64" textAnchor="middle" className="text-[9px] font-bold fill-[#B7791F]">
+                      <text x="66" y="64" textAnchor="middle" className="text-[9px] font-bold fill-[#C27803]">
                         ⏳ In VP Queue
                       </text>
                     ) : (
-                      <text x="66" y="64" textAnchor="middle" className="text-[9px] fill-[#78716C]">
+                      <text x="66" y="64" textAnchor="middle" className="text-[9px] fill-[#526582]">
                         Click to stream
                       </text>
                     )}
@@ -651,29 +650,29 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
           </div>
 
           {/* Bottom of Left Column: Live Store Shelf Stock & Velocity Status */}
-          <div className="bg-[#FAF7F2] border border-[#E6E0D3] rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="bg-[#F5F8FC] border border-[#DCE4EE] rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1">
               <div className="flex items-center space-x-2">
-                <Package className="h-4 w-4 text-[#2D6A4F]" />
-                <span className="text-xs font-bold text-[#1C1917]">
+                <Package className="h-4 w-4 text-[#0E5A8A]" />
+                <span className="text-xs font-bold text-[#14213D]">
                   Focused Store Telemetry: {targetStoreId}
                 </span>
               </div>
-              <p className="text-[11px] text-[#57534E]">
+              <p className="text-[11px] text-[#3B4E6B]">
                 Checkout Velocity:{' '}
-                <strong className={activeScenario ? 'text-[#B54834]' : 'text-[#2D6A4F]'}>
+                <strong className={activeScenario ? 'text-[#C93B2B]' : 'text-[#0D7A5F]'}>
                   {targetStoreInv.current_velocity || 48} packs/hr
                 </strong>{' '}
                 (Baseline: {targetStoreInv.burn_rate_base || 48}/hr) • Current Shelf:{' '}
-                <strong className="text-[#1C1917]">{targetStoreInv.on_hand} packs</strong> (Safety Reserve: {targetStoreInv.safety_buffer} packs)
+                <strong className="text-[#14213D]">{targetStoreInv.on_hand} packs</strong> (Safety Reserve: {targetStoreInv.safety_buffer} packs)
               </p>
             </div>
 
             {isCompleted && (
               <div className="flex items-center space-x-3 shrink-0">
                 <div className="text-right">
-                  <div className="text-[10px] uppercase font-bold text-[#78716C]">After Replenishment</div>
-                  <div className="text-xs font-mono font-bold text-[#2D6A4F]">
+                  <div className="text-[10px] uppercase font-bold text-[#526582]">After Replenishment</div>
+                  <div className="text-xs font-mono font-bold text-[#0D7A5F]">
                     {(targetStoreInv.on_hand + unitsTransferred).toLocaleString()} Packs • +${netProfitProtected.toLocaleString()} Profit Protected
                   </div>
                 </div>
@@ -683,18 +682,18 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
         </div>
 
         {/* RIGHT COLUMN (5 Cols): Live NexusTwin AI Multi-Agent System & 4 Mandatory Mathematical Checks */}
-        <div className="xl:col-span-5 bg-white border border-[#E6E0D3] rounded-2xl p-4 shadow-enterprise flex flex-col justify-between space-y-3">
+        <div className="xl:col-span-5 bg-white border border-[#DCE4EE] rounded-2xl p-4 shadow-enterprise flex flex-col justify-between space-y-3">
           {/* Right Panel Header */}
-          <div className="flex items-center justify-between border-b border-[#E6E0D3] pb-2.5">
+          <div className="flex items-center justify-between border-b border-[#DCE4EE] pb-2.5">
             <div className="flex items-center space-x-2.5">
-              <div className="h-8 w-8 rounded-lg bg-[#2D6A4F] text-white flex items-center justify-center shrink-0">
+              <div className="h-8 w-8 rounded-lg bg-[#0E5A8A] text-white flex items-center justify-center shrink-0">
                 <Cpu className="h-4 w-4" />
               </div>
               <div>
-                <h2 className="font-serif text-sm font-bold text-[#1C1917]">
+                <h2 className="font-serif text-sm font-bold text-[#14213D]">
                   NexusTwin AI Multi-Agent &amp; 4-Gate Execution
                 </h2>
-                <p className="text-[11px] text-[#78716C]">
+                <p className="text-[11px] text-[#526582]">
                   Live Telemetry &rarr; Multi-Agent Common Output &rarr; 4 Math Checks &rarr; ERP/A2A
                 </p>
               </div>
@@ -703,7 +702,7 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
             {hasCommonOutput && (
               <button
                 onClick={() => setShowCommonJson((prev) => !prev)}
-                className="flex items-center space-x-1 text-[11px] font-semibold bg-[#FAF7F2] hover:bg-[#F2F8F4] text-[#2D6A4F] border border-[#E6E0D3] px-2.5 py-1.5 rounded-lg transition cursor-pointer shrink-0"
+                className="flex items-center space-x-1 text-[11px] font-semibold bg-[#F5F8FC] hover:bg-[#ECF5FC] text-[#0E5A8A] border border-[#DCE4EE] px-2.5 py-1.5 rounded-lg transition cursor-pointer shrink-0"
               >
                 <FileJson className="h-3.5 w-3.5" />
                 <span>{showCommonJson ? 'Hide Common JSON' : 'Common Output JSON'}</span>
@@ -713,20 +712,20 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
 
           {/* IDLE STATE: Clean Standby View Before Any Scenario Is Triggered */}
           {phase === 'IDLE' && (
-            <div className="flex-1 flex flex-col items-center justify-center text-center p-6 bg-[#FAF7F2] border border-dashed border-[#D4CBB8] rounded-xl space-y-3">
-              <div className="h-12 w-12 rounded-2xl bg-[#F2F8F4] text-[#2D6A4F] border border-[#C3DFCD] flex items-center justify-center">
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-6 bg-[#F5F8FC] border border-dashed border-[#C4D0E0] rounded-xl space-y-3">
+              <div className="h-12 w-12 rounded-2xl bg-[#ECF5FC] text-[#0E5A8A] border border-[#C2DFF3] flex items-center justify-center">
                 <Radio className="h-6 w-6" />
               </div>
               <div className="space-y-1 max-w-sm">
-                <h3 className="font-serif text-sm font-bold text-[#1C1917]">
+                <h3 className="font-serif text-sm font-bold text-[#14213D]">
                   System Standby — Monitoring Live Store Streams
                 </h3>
-                <p className="text-xs text-[#57534E] leading-relaxed">
+                <p className="text-xs text-[#3B4E6B] leading-relaxed">
                   Click any of the <strong>4 Scenario Stream buttons</strong> at the top (or click a store on the map) to stream live POS, Weather, or Social data.
                 </p>
               </div>
-              <div className="w-full max-w-md bg-white border border-[#E6E0D3] rounded-xl p-3 text-left text-[11px] text-[#44403C] space-y-1.5">
-                <div className="font-bold text-[#1C1917] uppercase tracking-wider text-[10px]">
+              <div className="w-full max-w-md bg-white border border-[#DCE4EE] rounded-xl p-3 text-left text-[11px] text-[#3B4E6B] space-y-1.5">
+                <div className="font-bold text-[#14213D] uppercase tracking-wider text-[10px]">
                   What Happens When a Spike Is Detected:
                 </div>
                 <div>1. <strong>Live Alert Notification</strong> fires when shelf stock or velocity crosses threshold.</div>
@@ -739,36 +738,36 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
 
           {/* WAITING STATE: While Telemetry Is Streaming or Multi-Agent System Is Processing */}
           {isRunning && (
-            <div className="flex-1 flex flex-col justify-center p-5 bg-[#F2F8F4]/70 border border-[#C3DFCD] rounded-xl space-y-4">
+            <div className="flex-1 flex flex-col justify-center p-5 bg-[#ECF5FC]/70 border border-[#C2DFF3] rounded-xl space-y-4">
               <div className="flex items-center space-x-3">
-                <Loader2 className="h-7 w-7 text-[#2D6A4F] animate-spin shrink-0" />
+                <Loader2 className="h-7 w-7 text-[#0E5A8A] animate-spin shrink-0" />
                 <div>
-                  <h3 className="font-serif text-sm font-bold text-[#1C1917]">
+                  <h3 className="font-serif text-sm font-bold text-[#14213D]">
                     {phase === 'STREAMING_TELEMETRY'
                       ? 'Step 1: Receiving Live Store Telemetry Stream...'
                       : 'Step 2: NexusTwin AI Multi-Agent System Processing...'}
                   </h3>
-                  <p className="text-xs text-[#1E4D38] font-medium mt-0.5">
+                  <p className="text-xs text-[#094266] font-medium mt-0.5">
                     {phase === 'STREAMING_TELEMETRY' ? telemetryTickNote : agentStatusMsg}
                   </p>
                 </div>
               </div>
 
-              <div className="space-y-2 text-xs bg-white p-3.5 rounded-xl border border-[#E6E0D3]">
-                <div className="flex items-center space-x-2 text-[#44403C]">
-                  <Database className="h-4 w-4 text-[#7B2D53] shrink-0" />
+              <div className="space-y-2 text-xs bg-white p-3.5 rounded-xl border border-[#DCE4EE]">
+                <div className="flex items-center space-x-2 text-[#3B4E6B]">
+                  <Database className="h-4 w-4 text-[#0E5A8A] shrink-0" />
                   <span>
                     <strong>sensing_agent:</strong> Querying BigQuery Lakehouse (`pos_sales_stream`, `weather_forecast_25d`, `social_media_signals`)...
                   </span>
                 </div>
-                <div className="flex items-center space-x-2 text-[#44403C]">
-                  <Handshake className="h-4 w-4 text-[#B7791F] shrink-0" />
+                <div className="flex items-center space-x-2 text-[#3B4E6B]">
+                  <Handshake className="h-4 w-4 text-[#C27803] shrink-0" />
                   <span>
                     <strong>replenishment_agent:</strong> Checking SAP S/4HANA ERP warehouse ATP stock &amp; negotiating supplier/factory batch pricing...
                   </span>
                 </div>
-                <div className="flex items-center space-x-2 text-[#44403C]">
-                  <Calculator className="h-4 w-4 text-[#2D6A4F] shrink-0" />
+                <div className="flex items-center space-x-2 text-[#3B4E6B]">
+                  <Calculator className="h-4 w-4 text-[#0D7A5F] shrink-0" />
                   <span>
                     <strong>logistics_agent:</strong> Polling 3PL carrier rate tables &amp; preparing Standardized Common Output for the 4 Gate Checks...
                   </span>
@@ -779,8 +778,8 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
 
           {/* OPTIONAL: Standardized Common Multi-Agent Output JSON Inspector */}
           {hasCommonOutput && showCommonJson && (
-            <div className="bg-[#1C1917] text-[#DFF0E5] p-3 rounded-xl text-[10px] font-mono max-h-48 overflow-y-auto">
-              <div className="text-[#A8A29E] font-bold mb-1">
+            <div className="bg-[#14213D] text-[#D5F5E9] p-3 rounded-xl text-[10px] font-mono max-h-48 overflow-y-auto">
+              <div className="text-[#9BB0C9] font-bold mb-1">
                 // Standardized MultiAgentCommonOutput JSON (Input to 4 Gate Checks)
               </div>
               <pre className="whitespace-pre-wrap">{JSON.stringify(commonOut, null, 2)}</pre>
@@ -791,32 +790,32 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
           {hasCommonOutput && (
             <div className="space-y-2.5 flex-1">
               {/* AGENT 1 OUTPUT: Market Sensing Agent */}
-              <div className="rounded-xl border border-[#E6E0D3] bg-[#FAF7F2] p-3">
+              <div className="rounded-xl border border-[#DCE4EE] bg-[#F5F8FC] p-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <span className="h-5 w-5 rounded-full bg-[#7B2D53] text-white text-[10px] font-bold flex items-center justify-center">
+                    <span className="h-5 w-5 rounded-full bg-[#0E5A8A] text-white text-[10px] font-bold flex items-center justify-center">
                       1
                     </span>
-                    <span className="text-xs font-bold text-[#1C1917]">
-                      Market Sensing Agent (<code className="text-[#7B2D53] font-mono">{sensingOut.agent_name}</code>)
+                    <span className="text-xs font-bold text-[#14213D]">
+                      Market Sensing Agent (<code className="text-[#0E5A8A] font-mono">{sensingOut.agent_name}</code>)
                     </span>
                   </div>
-                  <span className="text-[10px] font-bold bg-[#FCF3F7] text-[#7B2D53] border border-[#EEC4D8] px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] font-bold bg-[#ECF5FC] text-[#0E5A8A] border border-[#C2DFF3] px-2 py-0.5 rounded-full">
                     BigQuery Telemetry MCP
                   </span>
                 </div>
                 <div className="mt-1.5 pl-7 space-y-1 text-[11px]">
-                  <div className="bg-white border border-[#E6E0D3] rounded-lg px-2.5 py-1.5 font-mono text-[11px] text-[#1C1917] flex flex-wrap items-center justify-between gap-2">
+                  <div className="bg-white border border-[#DCE4EE] rounded-lg px-2.5 py-1.5 font-mono text-[11px] text-[#14213D] flex flex-wrap items-center justify-between gap-2">
                     <span>
                       Spike = <strong>{sensingOut.observed_velocity_hr}/hr</strong> &divide;{' '}
                       {sensingOut.baseline_velocity_hr}/hr ={' '}
-                      <strong className="text-[#B54834]">{sensingOut.velocity_spike_ratio}x</strong>
+                      <strong className="text-[#C93B2B]">{sensingOut.velocity_spike_ratio}x</strong>
                     </span>
-                    <span className="text-[#B54834] font-bold">
+                    <span className="text-[#C93B2B] font-bold">
                       Shelf: {sensingOut.current_shelf_stock} packs ({sensingOut.stockout_runway_hours}h runway)
                     </span>
                   </div>
-                  <ul className="list-disc list-inside text-[10px] text-[#57534E] space-y-0.5">
+                  <ul className="list-disc list-inside text-[10px] text-[#526582] space-y-0.5">
                     {(sensingOut.activities_performed || []).map((act: string, i: number) => (
                       <li key={i}>{act}</li>
                     ))}
@@ -827,32 +826,32 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
               {/* AGENT 2 OUTPUT: Stock & Replenishment Agent (Includes ERP & Supplier Negotiation) */}
               <div
                 className={`rounded-xl border p-3 ${
-                  isFactoryPO ? 'bg-[#FEF9EE] border-[#F9DFAA]' : 'bg-[#FAF7F2] border-[#E6E0D3]'
+                  isFactoryPO ? 'bg-[#FFFBEB] border-[#FDE68A]' : 'bg-[#F5F8FC] border-[#DCE4EE]'
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <span className="h-5 w-5 rounded-full bg-[#2D6A4F] text-white text-[10px] font-bold flex items-center justify-center">
+                    <span className="h-5 w-5 rounded-full bg-[#0E5A8A] text-white text-[10px] font-bold flex items-center justify-center">
                       2
                     </span>
-                    <span className="text-xs font-bold text-[#1C1917]">
-                      Replenishment &amp; Supplier Agent (<code className="text-[#2D6A4F] font-mono">{repOut.agent_name}</code>)
+                    <span className="text-xs font-bold text-[#14213D]">
+                      Replenishment &amp; Supplier Agent (<code className="text-[#0E5A8A] font-mono">{repOut.agent_name}</code>)
                     </span>
                   </div>
                   <span
                     className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                       isFactoryPO
-                        ? 'bg-[#FDF0D5] text-[#925E14] border-[#F9DFAA]'
-                        : 'bg-[#F2F8F4] text-[#1E4D38] border-[#C3DFCD]'
+                        ? 'bg-[#FEF3C7] text-[#925802] border-[#FDE68A]'
+                        : 'bg-[#EEFBF6] text-[#095C47] border-[#B8EAD8]'
                     }`}
                   >
                     {isFactoryPO ? 'SAP ERP + Factory Negotiation' : 'SAP ERP Warehouse ATP'}
                   </span>
                 </div>
                 <div className="mt-1.5 pl-7 space-y-1 text-[11px]">
-                  <div className="bg-white border border-[#E6E0D3] rounded-lg px-2.5 py-1.5 text-[#1C1917]">
+                  <div className="bg-white border border-[#DCE4EE] rounded-lg px-2.5 py-1.5 text-[#14213D]">
                     <div>{repOut.finding_summary}</div>
-                    <div className="mt-1 text-[10px] text-[#1E4D38] bg-[#F2F8F4] px-2 py-1 rounded border border-[#C3DFCD] font-medium">
+                    <div className="mt-1 text-[10px] text-[#094266] bg-[#ECF5FC] px-2 py-1 rounded border border-[#C2DFF3] font-medium">
                       🤝 <strong>Supplier / Inventory Action:</strong> {repOut.supplier_negotiation_summary}
                     </div>
                   </div>
@@ -860,23 +859,23 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
               </div>
 
               {/* AGENT 3 OUTPUT: Carrier & Logistics Agent (Includes 3PL Rate Negotiation) */}
-              <div className="rounded-xl border border-[#E6E0D3] bg-[#FAF7F2] p-3">
+              <div className="rounded-xl border border-[#DCE4EE] bg-[#F5F8FC] p-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <span className="h-5 w-5 rounded-full bg-[#2D6A4F] text-white text-[10px] font-bold flex items-center justify-center">
+                    <span className="h-5 w-5 rounded-full bg-[#0E5A8A] text-white text-[10px] font-bold flex items-center justify-center">
                       3
                     </span>
-                    <span className="text-xs font-bold text-[#1C1917]">
-                      Carrier &amp; Logistics Agent (<code className="text-[#2D6A4F] font-mono">{logOut.agent_name}</code>)
+                    <span className="text-xs font-bold text-[#14213D]">
+                      Carrier &amp; Logistics Agent (<code className="text-[#0E5A8A] font-mono">{logOut.agent_name}</code>)
                     </span>
                   </div>
-                  <span className="text-[10px] font-mono font-bold bg-[#F3EFE6] text-[#1C1917] border border-[#E6E0D3] px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] font-mono font-bold bg-[#EBF1F8] text-[#14213D] border border-[#DCE4EE] px-2 py-0.5 rounded-full">
                     Transit: {logOut.transit_hours}h • Ship: ${logOut.freight_cost_usd.toLocaleString()}
                   </span>
                 </div>
-                <div className="mt-1.5 pl-7 space-y-1 text-[11px] text-[#44403C]">
+                <div className="mt-1.5 pl-7 space-y-1 text-[11px] text-[#3B4E6B]">
                   <div>{logOut.finding_summary}</div>
-                  <div className="text-[10px] text-[#1E4D38] bg-[#F2F8F4] px-2 py-1 rounded border border-[#C3DFCD] font-medium">
+                  <div className="text-[10px] text-[#095C47] bg-[#EEFBF6] px-2 py-1 rounded border border-[#B8EAD8] font-medium">
                     🚚 <strong>3PL Rate Negotiation:</strong> {logOut.carrier_negotiation_summary}
                   </div>
                 </div>
@@ -884,22 +883,22 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
 
               {/* STAGE 4: THE 4 MANDATORY MATHEMATICAL GATE CHECKS */}
               {hasGateChecked && (
-                <div className="rounded-xl border border-[#C3DFCD] bg-[#F2F8F4]/70 p-3">
+                <div className="rounded-xl border border-[#C2DFF3] bg-[#ECF5FC]/70 p-3">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center space-x-2">
-                      <span className="h-5 w-5 rounded-full bg-[#1E4D38] text-white text-[10px] font-bold flex items-center justify-center">
+                      <span className="h-5 w-5 rounded-full bg-[#094266] text-white text-[10px] font-bold flex items-center justify-center">
                         4
                       </span>
-                      <span className="text-xs font-bold text-[#1C1917] flex items-center gap-1">
-                        <Calculator className="h-3.5 w-3.5 text-[#2D6A4F]" />
+                      <span className="text-xs font-bold text-[#14213D] flex items-center gap-1">
+                        <Calculator className="h-3.5 w-3.5 text-[#0E5A8A]" />
                         <span>4 Mandatory Mathematical Gate Checks (on Common Output)</span>
                       </span>
                     </div>
                     <span
                       className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                         isFactoryPO
-                          ? 'bg-[#FEF9EE] text-[#925E14] border-[#F9DFAA]'
-                          : 'bg-[#DFF0E5] text-[#1E4D38] border-[#C3DFCD]'
+                          ? 'bg-[#FFFBEB] text-[#925802] border-[#FDE68A]'
+                          : 'bg-[#EEFBF6] text-[#095C47] border-[#B8EAD8]'
                       }`}
                     >
                       {isFactoryPO ? '3 PASS • CHECK 4 -> VP SIGN-OFF' : 'ALL 4 MATH CHECKS PASSED'}
@@ -918,20 +917,20 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
                         <div
                           key={rule.rule_name}
                           className={`rounded-lg p-2 border flex flex-col justify-between ${
-                            rule.passed ? 'bg-white border-[#C3DFCD]' : 'bg-[#FEF9EE] border-[#F9DFAA]'
+                            rule.passed ? 'bg-white border-[#B8EAD8]' : 'bg-[#FFFBEB] border-[#FDE68A]'
                           }`}
                         >
                           <div className="flex items-center justify-between">
-                            <span className="font-bold text-[#1C1917]">{shortTitles[idx] || rule.rule_name}</span>
+                            <span className="font-bold text-[#14213D]">{shortTitles[idx] || rule.rule_name}</span>
                             <span
                               className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                                rule.passed ? 'bg-[#F2F8F4] text-[#2D6A4F]' : 'bg-[#FDF0D5] text-[#925E14]'
+                                rule.passed ? 'bg-[#EEFBF6] text-[#0D7A5F]' : 'bg-[#FEF3C7] text-[#925802]'
                               }`}
                             >
                               {rule.passed ? 'PASS ✓' : 'VP QUEUE ⏳'}
                             </span>
                           </div>
-                          <div className="font-mono text-[10px] text-[#44403C] mt-0.5">
+                          <div className="font-mono text-[10px] text-[#3B4E6B] mt-0.5">
                             {rule.formula_expression || rule.message}
                           </div>
                         </div>
@@ -945,19 +944,19 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
               {isCompleted && (
                 <div
                   className={`rounded-xl border p-3.5 ${
-                    isFactoryPO ? 'bg-[#FEF9EE] border-[#F9DFAA]' : 'bg-[#F2F8F4] border-[#C3DFCD]'
+                    isFactoryPO ? 'bg-[#FFFBEB] border-[#FDE68A]' : 'bg-[#EEFBF6] border-[#B8EAD8]'
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <span
                         className={`h-5 w-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center ${
-                          isFactoryPO ? 'bg-[#B7791F]' : 'bg-[#2D6A4F]'
+                          isFactoryPO ? 'bg-[#C27803]' : 'bg-[#0D7A5F]'
                         }`}
                       >
                         5
                       </span>
-                      <span className="text-xs font-bold text-[#1C1917]">
+                      <span className="text-xs font-bold text-[#14213D]">
                         {isFactoryPO
                           ? 'Final Step: Handed Over to VP Approval Queue (:8001)'
                           : 'Final Step: SAP Stock Transfer Order Dispatched'}
@@ -966,8 +965,8 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
                     <span
                       className={`text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-lg border ${
                         isFactoryPO
-                          ? 'bg-white text-[#925E14] border-[#F9DFAA]'
-                          : 'bg-white text-[#1E4D38] border-[#C3DFCD]'
+                          ? 'bg-white text-[#925802] border-[#FDE68A]'
+                          : 'bg-white text-[#095C47] border-[#B8EAD8]'
                       }`}
                     >
                       {isFactoryPO ? 'PENDING VP SIGN-OFF' : lastDecision?.sap_transfer_order_id}
@@ -978,15 +977,15 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
                     {isFactoryPO && onOpenApprovals ? (
                       <button
                         onClick={onOpenApprovals}
-                        className="flex items-center space-x-1.5 bg-[#B7791F] hover:bg-[#925E14] text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs transition cursor-pointer"
+                        className="flex items-center space-x-1.5 bg-[#C27803] hover:bg-[#925802] text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs transition cursor-pointer"
                       >
                         <ShieldAlert className="h-4 w-4" />
                         <span>Open Tab 5: Approve Factory Order (${totalCommitment.toLocaleString()})</span>
                         <ArrowRight className="h-3.5 w-3.5" />
                       </button>
                     ) : (
-                      <div className="flex items-center space-x-1.5 text-[11px] font-bold text-[#1E4D38]">
-                        <CheckCircle2 className="h-4 w-4 text-[#2D6A4F]" />
+                      <div className="flex items-center space-x-1.5 text-[11px] font-bold text-[#095C47]">
+                        <CheckCircle2 className="h-4 w-4 text-[#0D7A5F]" />
                         <span>
                           BigQuery Inventory Updated • Net Profit Protected: +${netProfitProtected.toLocaleString()}
                         </span>
@@ -995,7 +994,7 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
 
                     <button
                       onClick={() => setShowRawTrace((prev) => !prev)}
-                      className="text-[11px] font-semibold text-[#2D6A4F] hover:text-[#1E4D38] flex items-center space-x-1 cursor-pointer"
+                      className="text-[11px] font-semibold text-[#0E5A8A] hover:text-[#094266] flex items-center space-x-1 cursor-pointer"
                     >
                       <span>{showRawTrace ? 'Hide Agent Trace' : 'View Agent Trace'}</span>
                       {showRawTrace ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
@@ -1003,7 +1002,7 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({ onOpenApprovals,
                   </div>
 
                   {showRawTrace && (
-                    <div className="mt-2 ml-7 p-2.5 bg-white border border-[#E6E0D3] rounded-lg text-[11px] font-mono text-[#44403C] max-h-32 overflow-y-auto whitespace-pre-wrap">
+                    <div className="mt-2 ml-7 p-2.5 bg-white border border-[#DCE4EE] rounded-lg text-[11px] font-mono text-[#3B4E6B] max-h-32 overflow-y-auto whitespace-pre-wrap">
                       {lastDecision?.agent_response_text || lastDecision?.root_cause_explanation}
                     </div>
                   )}

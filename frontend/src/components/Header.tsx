@@ -1,12 +1,17 @@
 import React, { useState } from 'react';
-import { Bell, RotateCcw, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { Bell, RotateCcw, ShieldCheck, CheckCircle2, Palette } from 'lucide-react';
 import { TabType } from '../types';
+import { apiUrl } from '../apiConfig';
+
+export type UIThemeType = 'cerulean' | 'vitrine' | 'midnight';
 
 interface HeaderProps {
   activeTab: TabType;
   pendingCount: number;
   onOpenApprovals: () => void;
   onResetComplete?: () => void;
+  theme: UIThemeType;
+  onChangeTheme: (theme: UIThemeType) => void;
 }
 
 const VIEW_METADATA: Record<
@@ -45,11 +50,39 @@ const VIEW_METADATA: Record<
   },
 };
 
+const THEME_SWATCHES: {
+  id: UIThemeType;
+  label: string;
+  primaryHex: string;
+  secondaryHex: string;
+}[] = [
+  {
+    id: 'cerulean',
+    label: 'Retail Pearl & Cerulean (Default)',
+    primaryHex: '#0E5A8A',
+    secondaryHex: '#EBF1F8',
+  },
+  {
+    id: 'vitrine',
+    label: 'Vitrine Warm Ivory & Forest Sage',
+    primaryHex: '#2D6A4F',
+    secondaryHex: '#FAF7F2',
+  },
+  {
+    id: 'midnight',
+    label: 'Soft Dusk Slate & Sky Blue',
+    primaryHex: '#2C3B52',
+    secondaryHex: '#38BDF8',
+  },
+];
+
 export const Header: React.FC<HeaderProps> = ({
   activeTab,
   pendingCount,
   onOpenApprovals,
   onResetComplete,
+  theme,
+  onChangeTheme,
 }) => {
   const [resetting, setResetting] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
@@ -60,7 +93,7 @@ export const Header: React.FC<HeaderProps> = ({
     setResetting(true);
     setResetSuccess(false);
     try {
-      await fetch('/api/v1/twin/reset', {
+      await fetch(apiUrl('/api/v1/twin/reset'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -76,65 +109,92 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-[#E6E0D3] px-5 py-3 flex flex-wrap items-center justify-between gap-3 shrink-0 select-none">
-      {/* Left: VITRINE Editorial View Title & Outcome Question Pill */}
+    <header className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-[#DCE4EE] px-5 py-3 flex flex-wrap items-center justify-between gap-3 shrink-0 select-none">
+      {/* Left: View Title & Outcome Question Pill */}
       <div className="flex flex-wrap items-center gap-2.5 min-w-0">
-        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-[#181614] text-white shrink-0">
+        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-[#14213D] text-white shrink-0">
           {meta.badge}
         </span>
-        <h2 className="font-serif text-base sm:text-lg font-bold text-[#1C1917] tracking-tight truncate">
+        <h2 className="font-serif text-base sm:text-lg font-bold text-[#14213D] tracking-tight truncate">
           {meta.title}
         </h2>
-        <span className="hidden 2xl:inline-flex items-center text-xs text-[#1E4D38] font-medium bg-[#F2F8F4] px-2.5 py-1 rounded-md border border-[#C3DFCD] truncate">
+        <span className="hidden 2xl:inline-flex items-center text-xs text-[#094266] font-medium bg-[#ECF5FC] px-2.5 py-1 rounded-md border border-[#C2DFF3] truncate">
           {meta.question}
         </span>
       </div>
 
-      {/* Right: Guardrail Pill + Reset Demo Stock + Synced Manager Approvals Badge */}
+      {/* Right: Guardrail Pill + Reset Demo Stock + Manager Approvals + 3-Theme Color Switcher */}
       <div className="flex items-center gap-2.5 shrink-0">
         {resetSuccess && (
-          <div className="flex items-center space-x-1.5 text-[11px] bg-[#F2F8F4] border border-[#C3DFCD] text-[#1E4D38] px-2.5 py-1.5 rounded-lg font-semibold whitespace-nowrap">
-            <CheckCircle2 className="h-3.5 w-3.5 text-[#2D6A4F] shrink-0" />
+          <div className="flex items-center space-x-1.5 text-[11px] bg-[#EEFBF6] border border-[#B8EAD8] text-[#095C47] px-2.5 py-1.5 rounded-lg font-semibold whitespace-nowrap">
+            <CheckCircle2 className="h-3.5 w-3.5 text-[#0D7A5F] shrink-0" />
             <span>Demo Stock Reset!</span>
           </div>
         )}
 
-        <div className="hidden xl:flex items-center gap-3 px-3 py-1.5 rounded-lg bg-[#FAF7F2] border border-[#E6E0D3] text-[11px]">
-          <span className="flex items-center gap-1 font-semibold text-[#57534E]">
-            <ShieldCheck className="w-3.5 h-3.5 text-[#2D6A4F]" />
+        <div className="hidden xl:flex items-center gap-2.5 px-3 py-1.5 rounded-lg bg-[#F5F8FC] border border-[#DCE4EE] text-[11px]">
+          <span className="flex items-center gap-1 font-semibold text-[#526582]">
+            <ShieldCheck className="w-3.5 h-3.5 text-[#0D7A5F]" />
             Guardrails:
           </span>
-          <span className="font-mono font-semibold text-[#1C1917]">Auto-Cap &le; $1,000</span>
-          <span className="text-[#D4CBB8]">|</span>
-          <span className="font-mono font-semibold text-[#2D6A4F]">4 Math Gates</span>
+          <span className="font-mono font-semibold text-[#14213D]">Auto-Cap &le; $1,000</span>
+          <span className="text-[#C4D0E0]">|</span>
+          <span className="font-mono font-semibold text-[#0E5A8A]">4 Math Gates</span>
         </div>
 
         <button
           onClick={handleResetDemo}
           disabled={resetting}
           title="Reset all store shelves, warehouse stock, and pending approvals back to starting levels"
-          className="flex items-center space-x-1.5 bg-[#FAF7F2] hover:bg-[#F2F8F4] border border-[#E6E0D3] hover:border-[#C3DFCD] text-[#1C1917] hover:text-[#1E4D38] text-xs font-semibold px-3 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap shadow-xs"
+          className="flex items-center space-x-1.5 bg-[#F5F8FC] hover:bg-[#ECF5FC] border border-[#DCE4EE] hover:border-[#C2DFF3] text-[#14213D] hover:text-[#094266] text-xs font-semibold px-3 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap shadow-xs"
         >
-          <RotateCcw className={`h-3.5 w-3.5 text-[#2D6A4F] shrink-0 ${resetting ? 'animate-spin' : ''}`} />
+          <RotateCcw className={`h-3.5 w-3.5 text-[#0E5A8A] shrink-0 ${resetting ? 'animate-spin' : ''}`} />
           <span>{resetting ? 'Resetting...' : 'Reset Demo Stock'}</span>
         </button>
 
         <button
           onClick={onOpenApprovals}
-          className="relative flex items-center space-x-1.5 bg-[#FEF9EE] hover:bg-[#FDF0D5] border border-[#F9DFAA] text-[#925E14] text-xs font-semibold px-3 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap shadow-xs"
+          className="relative flex items-center space-x-1.5 bg-[#FFFBEB] hover:bg-[#FEF3C7] border border-[#FDE68A] text-[#925802] text-xs font-semibold px-3 py-1.5 rounded-lg transition cursor-pointer whitespace-nowrap shadow-xs"
         >
-          <Bell className="h-3.5 w-3.5 text-[#B7791F] shrink-0" />
+          <Bell className="h-3.5 w-3.5 text-[#C27803] shrink-0" />
           <span>Manager Approvals</span>
           <span
             className={`ml-1 font-mono font-bold text-[10px] px-1.5 py-0.5 rounded-full ${
               pendingCount > 0
-                ? 'bg-[#B7791F] text-white'
-                : 'bg-[#E6E0D3] text-[#57534E]'
+                ? 'bg-[#C27803] text-white'
+                : 'bg-[#DCE4EE] text-[#526582]'
             }`}
           >
             {pendingCount}
           </span>
         </button>
+
+        {/* Top-Right Compact 3-Theme Color Switcher */}
+        <div
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#F5F8FC] border border-[#DCE4EE]"
+          title="Switch UI Color Theme"
+        >
+          <Palette className="h-3.5 w-3.5 text-[#526582] mr-0.5 shrink-0" />
+          {THEME_SWATCHES.map((sw) => {
+            const isSelected = theme === sw.id;
+            return (
+              <button
+                key={sw.id}
+                onClick={() => onChangeTheme(sw.id)}
+                title={sw.label}
+                aria-label={sw.label}
+                className={`relative h-5 w-5 rounded-full overflow-hidden border transition-all cursor-pointer flex items-center justify-center ${
+                  isSelected
+                    ? 'ring-2 ring-[#0E5A8A] ring-offset-1 scale-110 border-white shadow-sm'
+                    : 'border-[#9BB0C9] opacity-80 hover:opacity-100 hover:scale-105'
+                }`}
+                style={{
+                  background: `linear-gradient(135deg, ${sw.primaryHex} 55%, ${sw.secondaryHex} 55%)`,
+                }}
+              />
+            );
+          })}
+        </div>
       </div>
     </header>
   );

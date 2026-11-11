@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Sliders, Play, RotateCcw, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { apiUrl } from '../apiConfig';
 
 export const WhatIfSimulator: React.FC = () => {
   const [demandSurgePct, setDemandSurgePct] = useState<number>(380);
@@ -58,7 +59,9 @@ export const WhatIfSimulator: React.FC = () => {
       };
 
       const res = await fetch(
-        `/api/v1/governance/gate/evaluate?store_stockout_runway_hours=${Math.max(18.0, runwayHours)}&has_human_approval=false`,
+        apiUrl(
+          `/api/v1/governance/gate/evaluate?store_stockout_runway_hours=${Math.max(18.0, runwayHours)}&has_human_approval=false`
+        ),
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -78,12 +81,12 @@ export const WhatIfSimulator: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col p-6 space-y-6 overflow-y-auto">
-      <div className="bg-white border border-[#E6E0D3] rounded-2xl p-5 shadow-enterprise flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white border border-[#DCE4EE] rounded-2xl p-5 shadow-enterprise flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="font-serif text-lg font-bold text-[#1C1917]">
+          <h1 className="font-serif text-lg font-bold text-[#14213D]">
             What-If Supply Chain Scenario Planner
           </h1>
-          <p className="text-xs text-[#78716C] mt-1">
+          <p className="text-xs text-[#526582] mt-1">
             Drag the sliders below to test how different customer demand spikes and trucking rates impact profit and the $1,000 Auto-Approval Policy.
           </p>
         </div>
@@ -91,16 +94,16 @@ export const WhatIfSimulator: React.FC = () => {
           <button
             onClick={runLiveBackendGateEvaluation}
             disabled={evaluating}
-            className="flex items-center space-x-1.5 text-xs text-white font-bold bg-[#2D6A4F] hover:bg-[#1E4D38] px-3.5 py-2 rounded-xl transition cursor-pointer shadow-xs"
+            className="flex items-center space-x-1.5 text-xs text-white font-bold bg-[#0E5A8A] hover:bg-[#094266] px-3.5 py-2 rounded-xl transition cursor-pointer shadow-xs"
           >
             <Play className="h-3.5 w-3.5" />
             <span>{evaluating ? 'Testing Policy...' : 'Test Against Live 4-Rule Policy'}</span>
           </button>
           <button
             onClick={handleReset}
-            className="flex items-center space-x-1.5 text-xs text-[#1C1917] hover:bg-[#F3EFE6] bg-[#FAF7F2] px-3.5 py-2 rounded-xl border border-[#E6E0D3] font-semibold transition cursor-pointer"
+            className="flex items-center space-x-1.5 text-xs text-[#14213D] hover:bg-[#ECF5FC] bg-[#F5F8FC] px-3.5 py-2 rounded-xl border border-[#DCE4EE] font-semibold transition cursor-pointer"
           >
-            <RotateCcw className="h-3.5 w-3.5 text-[#2D6A4F]" />
+            <RotateCcw className="h-3.5 w-3.5 text-[#0E5A8A]" />
             <span>Reset Sliders</span>
           </button>
         </div>
@@ -108,10 +111,10 @@ export const WhatIfSimulator: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Controls Column */}
-        <div className="bg-white border border-[#E6E0D3] rounded-2xl p-6 shadow-enterprise space-y-6">
-          <div className="flex items-center space-x-2 border-b border-[#E6E0D3] pb-3">
-            <Sliders className="h-4 w-4 text-[#2D6A4F]" />
-            <h2 className="font-serif text-sm font-bold text-[#1C1917]">
+        <div className="bg-white border border-[#DCE4EE] rounded-2xl p-6 shadow-enterprise space-y-6">
+          <div className="flex items-center space-x-2 border-b border-[#DCE4EE] pb-3">
+            <Sliders className="h-4 w-4 text-[#0E5A8A]" />
+            <h2 className="font-serif text-sm font-bold text-[#14213D]">
               Adjust Store &amp; Shipping Conditions
             </h2>
           </div>
@@ -119,8 +122,8 @@ export const WhatIfSimulator: React.FC = () => {
           {/* Slider 1: Demand Surge % */}
           <div className="space-y-2">
             <div className="flex justify-between text-xs">
-              <span className="font-semibold text-[#1C1917]">1. Customer Checkout Demand Spike</span>
-              <span className="font-mono text-[#B54834] font-bold">
+              <span className="font-semibold text-[#14213D]">1. Customer Checkout Demand Spike</span>
+              <span className="font-mono text-[#C93B2B] font-bold">
                 +{demandSurgePct}% ({currentVelocity} packs/hr)
               </span>
             </div>
@@ -131,15 +134,15 @@ export const WhatIfSimulator: React.FC = () => {
               step="10"
               value={demandSurgePct}
               onChange={(e) => setDemandSurgePct(Number(e.target.value))}
-              className="w-full accent-[#2D6A4F] cursor-pointer"
+              className="w-full accent-[#0E5A8A] cursor-pointer"
             />
           </div>
 
           {/* Slider 2: Expedited Freight Cost */}
           <div className="space-y-2">
             <div className="flex justify-between text-xs">
-              <span className="font-semibold text-[#1C1917]">2. Trucking Carrier Shipping Cost</span>
-              <span className={`font-mono font-bold ${freightCost > 1000 ? 'text-[#B7791F]' : 'text-[#2D6A4F]'}`}>
+              <span className="font-semibold text-[#14213D]">2. Trucking Carrier Shipping Cost</span>
+              <span className={`font-mono font-bold ${freightCost > 1000 ? 'text-[#C27803]' : 'text-[#0D7A5F]'}`}>
                 ${freightCost.toLocaleString()}{' '}
                 {freightCost > 1000 ? '(Over $1,000 -> Needs Manager Sign-Off)' : '(Under $1,000 -> Auto-Approved)'}
               </span>
@@ -151,15 +154,15 @@ export const WhatIfSimulator: React.FC = () => {
               step="50"
               value={freightCost}
               onChange={(e) => setFreightCost(Number(e.target.value))}
-              className="w-full accent-[#2D6A4F] cursor-pointer"
+              className="w-full accent-[#0E5A8A] cursor-pointer"
             />
           </div>
 
           {/* Slider 3: Austin DC Available Stock */}
           <div className="space-y-2">
             <div className="flex justify-between text-xs">
-              <span className="font-semibold text-[#1C1917]">3. Austin Regional Warehouse Stock</span>
-              <span className="font-mono text-[#2D6A4F] font-bold">{austinStock.toLocaleString()} packs</span>
+              <span className="font-semibold text-[#14213D]">3. Austin Regional Warehouse Stock</span>
+              <span className="font-mono text-[#0E5A8A] font-bold">{austinStock.toLocaleString()} packs</span>
             </div>
             <input
               type="range"
@@ -168,15 +171,15 @@ export const WhatIfSimulator: React.FC = () => {
               step="100"
               value={austinStock}
               onChange={(e) => setAustinStock(Number(e.target.value))}
-              className="w-full accent-[#2D6A4F] cursor-pointer"
+              className="w-full accent-[#0E5A8A] cursor-pointer"
             />
           </div>
 
           {/* Slider 4: Heatwave Duration */}
           <div className="space-y-2">
             <div className="flex justify-between text-xs">
-              <span className="font-semibold text-[#1C1917]">4. Heatwave Duration</span>
-              <span className="font-mono text-[#B7791F] font-bold">{heatwaveDurationDays} Days</span>
+              <span className="font-semibold text-[#14213D]">4. Heatwave Duration</span>
+              <span className="font-mono text-[#C27803] font-bold">{heatwaveDurationDays} Days</span>
             </div>
             <input
               type="range"
@@ -185,23 +188,23 @@ export const WhatIfSimulator: React.FC = () => {
               step="1"
               value={heatwaveDurationDays}
               onChange={(e) => setHeatwaveDurationDays(Number(e.target.value))}
-              className="w-full accent-[#2D6A4F] cursor-pointer"
+              className="w-full accent-[#0E5A8A] cursor-pointer"
             />
           </div>
         </div>
 
         {/* Live Simulation Outcomes */}
-        <div className="bg-white border border-[#E6E0D3] rounded-2xl p-6 shadow-enterprise space-y-4 flex flex-col justify-between">
+        <div className="bg-white border border-[#DCE4EE] rounded-2xl p-6 shadow-enterprise space-y-4 flex flex-col justify-between">
           <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-[#E6E0D3] pb-3">
-              <h2 className="font-serif text-sm font-bold text-[#1C1917]">
+            <div className="flex items-center justify-between border-b border-[#DCE4EE] pb-3">
+              <h2 className="font-serif text-sm font-bold text-[#14213D]">
                 Simulated Decision &amp; Profit Outcome
               </h2>
               <span
                 className={`text-[11px] font-bold px-3 py-0.5 rounded-full border ${
                   requiresHumanApproval
-                    ? 'bg-[#FEF9EE] text-[#925E14] border-[#F9DFAA]'
-                    : 'bg-[#F2F8F4] text-[#1E4D38] border-[#C3DFCD]'
+                    ? 'bg-[#FFFBEB] text-[#925802] border-[#FDE68A]'
+                    : 'bg-[#EEFBF6] text-[#095C47] border-[#B8EAD8]'
                 }`}
               >
                 {requiresHumanApproval ? 'PAUSED FOR MANAGER APPROVAL' : 'AUTOMATICALLY APPROVED'}
@@ -209,40 +212,40 @@ export const WhatIfSimulator: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="bg-[#FAF7F2] p-4 rounded-xl border border-[#E6E0D3]">
-                <span className="text-[#78716C] text-[11px] font-medium">Time Until Shelf Is Empty</span>
-                <p className="font-serif text-xl font-bold text-[#B54834] mt-1">{runwayHours} Hours</p>
-                <p className="text-[11px] text-[#78716C] mt-0.5">At {currentVelocity} packs/hr buying speed</p>
+              <div className="bg-[#F5F8FC] p-4 rounded-xl border border-[#DCE4EE]">
+                <span className="text-[#526582] text-[11px] font-medium">Time Until Shelf Is Empty</span>
+                <p className="font-serif text-xl font-bold text-[#C93B2B] mt-1">{runwayHours} Hours</p>
+                <p className="text-[11px] text-[#526582] mt-0.5">At {currentVelocity} packs/hr buying speed</p>
               </div>
 
-              <div className="bg-[#FAF7F2] p-4 rounded-xl border border-[#E6E0D3]">
-                <span className="text-[#78716C] text-[11px] font-medium">Recommended Restock Shipment</span>
-                <p className="font-serif text-xl font-bold text-[#2D6A4F] mt-1">{unitsNeeded.toLocaleString()} packs</p>
-                <p className="text-[11px] text-[#78716C] mt-0.5">From Austin Regional Warehouse</p>
+              <div className="bg-[#F5F8FC] p-4 rounded-xl border border-[#DCE4EE]">
+                <span className="text-[#526582] text-[11px] font-medium">Recommended Restock Shipment</span>
+                <p className="font-serif text-xl font-bold text-[#0E5A8A] mt-1">{unitsNeeded.toLocaleString()} packs</p>
+                <p className="text-[11px] text-[#526582] mt-0.5">From Austin Regional Warehouse</p>
               </div>
 
-              <div className="bg-[#FAF7F2] p-4 rounded-xl border border-[#E6E0D3]">
-                <span className="text-[#78716C] text-[11px] font-medium">Store Profit Protected</span>
-                <p className="font-serif text-xl font-bold text-[#2D6A4F] mt-1">${protectedMargin.toLocaleString()}</p>
-                <p className="text-[11px] text-[#78716C] mt-0.5">@ $6.20 profit per pack</p>
+              <div className="bg-[#F5F8FC] p-4 rounded-xl border border-[#DCE4EE]">
+                <span className="text-[#526582] text-[11px] font-medium">Store Profit Protected</span>
+                <p className="font-serif text-xl font-bold text-[#0D7A5F] mt-1">${protectedMargin.toLocaleString()}</p>
+                <p className="text-[11px] text-[#526582] mt-0.5">@ $6.20 profit per pack</p>
               </div>
 
-              <div className="bg-[#FAF7F2] p-4 rounded-xl border border-[#E6E0D3]">
-                <span className="text-[#78716C] text-[11px] font-medium">Net Profit After Shipping</span>
-                <p className="font-serif text-xl font-bold text-[#1C1917] mt-1">+${netValue.toLocaleString()}</p>
-                <p className="text-[11px] text-[#78716C] mt-0.5">After subtracting ${freightCost} shipping</p>
+              <div className="bg-[#F5F8FC] p-4 rounded-xl border border-[#DCE4EE]">
+                <span className="text-[#526582] text-[11px] font-medium">Net Profit After Shipping</span>
+                <p className="font-serif text-xl font-bold text-[#14213D] mt-1">+${netValue.toLocaleString()}</p>
+                <p className="text-[11px] text-[#526582] mt-0.5">After subtracting ${freightCost} shipping</p>
               </div>
             </div>
 
             {liveGateResult?.rules_evaluated && (
-              <div className="bg-[#F2F8F4] p-3.5 rounded-xl border border-[#C3DFCD] space-y-1.5 text-xs">
-                <span className="text-[11px] font-bold text-[#1E4D38] block">
+              <div className="bg-[#ECF5FC] p-3.5 rounded-xl border border-[#C2DFF3] space-y-1.5 text-xs">
+                <span className="text-[11px] font-bold text-[#094266] block">
                   Live 4-Rule Policy Check Results:
                 </span>
                 {liveGateResult.rules_evaluated.map((r: any, idx: number) => (
                   <div key={idx} className="flex items-center justify-between text-[11px] font-medium">
-                    <span className="text-[#44403C]">{r.rule_name}</span>
-                    <span className={r.passed ? 'text-[#2D6A4F] font-bold' : 'text-[#B7791F] font-bold'}>
+                    <span className="text-[#3B4E6B]">{r.rule_name}</span>
+                    <span className={r.passed ? 'text-[#0D7A5F] font-bold' : 'text-[#C27803] font-bold'}>
                       {r.passed ? '✅ PASSED' : '⚠️ NEEDS MANAGER SIGN-OFF'}
                     </span>
                   </div>
@@ -253,15 +256,15 @@ export const WhatIfSimulator: React.FC = () => {
             <div
               className={`p-4 rounded-xl border text-xs space-y-1 ${
                 requiresHumanApproval
-                  ? 'bg-[#FEF9EE] border-[#F9DFAA] text-[#925E14]'
-                  : 'bg-[#F2F8F4] border-[#C3DFCD] text-[#1E4D38]'
+                  ? 'bg-[#FFFBEB] border-[#FDE68A] text-[#925802]'
+                  : 'bg-[#EEFBF6] border-[#B8EAD8] text-[#095C47]'
               }`}
             >
               <div className="flex items-center space-x-1.5 font-bold">
                 {requiresHumanApproval ? (
-                  <ShieldAlert className="h-4 w-4 text-[#B7791F]" />
+                  <ShieldAlert className="h-4 w-4 text-[#C27803]" />
                 ) : (
-                  <CheckCircle2 className="h-4 w-4 text-[#2D6A4F]" />
+                  <CheckCircle2 className="h-4 w-4 text-[#0D7A5F]" />
                 )}
                 <span>
                   {requiresHumanApproval
@@ -269,7 +272,7 @@ export const WhatIfSimulator: React.FC = () => {
                     : 'Why This Order Ships Automatically:'}
                 </span>
               </div>
-              <p className="text-[#44403C] leading-relaxed">
+              <p className="text-[#3B4E6B] leading-relaxed">
                 {requiresHumanApproval
                   ? `Shipping cost of $${freightCost.toLocaleString()} is above the $1,000 automatic spending limit. The order is paused and sent to Tab 5 (Manager Sign-Off Queue).`
                   : `Shipping cost of $${freightCost.toLocaleString()} is under the $1,000 automatic limit. The truck is dispatched immediately without waiting for manual paperwork.`}

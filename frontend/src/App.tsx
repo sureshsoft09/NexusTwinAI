@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { TabType } from './types';
-import { Header } from './components/Header';
+import { apiUrl, wsUrl } from './apiConfig';
+import { Header, UIThemeType } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { DigitalTwinMap } from './pages/DigitalTwinMap';
 import { MarketRadar } from './pages/MarketRadar';
@@ -23,10 +24,19 @@ export const App: React.FC = () => {
   const [cards, setCards] = useState<A2AApprovalCard[]>([]);
   const [approvedOrders, setApprovedOrders] = useState<Record<string, string>>({});
   const [resetVersion, setResetVersion] = useState<number>(0);
+  const [theme, setTheme] = useState<UIThemeType>(() => {
+    const saved = localStorage.getItem('nexustwin_ui_theme') as UIThemeType | null;
+    return saved === 'vitrine' || saved === 'midnight' || saved === 'cerulean' ? saved : 'cerulean';
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('nexustwin_ui_theme', theme);
+  }, [theme]);
 
   const fetchPendingCards = useCallback(async () => {
     try {
-      const res = await fetch('/api/v1/governance/pending');
+      const res = await fetch(apiUrl('/api/v1/governance/pending'));
       if (res.ok) {
         const data = await res.json();
         const rawList = Array.isArray(data) ? data : data.pending_approvals;
@@ -48,9 +58,7 @@ export const App: React.FC = () => {
   useEffect(() => {
     let ws: WebSocket | null = null;
     try {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/api/v1/twin/ws/telemetry`;
-      ws = new WebSocket(wsUrl);
+      ws = new WebSocket(wsUrl('/api/v1/twin/ws/telemetry'));
 
       ws.onmessage = (event) => {
         try {
@@ -77,7 +85,7 @@ export const App: React.FC = () => {
 
   const handleApproveCard = async (eventId: string) => {
     try {
-      const res = await fetch('/api/v1/governance/approve', {
+      const res = await fetch(apiUrl('/api/v1/governance/approve'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -153,7 +161,7 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#FAF7F2] font-sans text-[#1C1917] antialiased">
+    <div className="flex h-screen w-screen overflow-hidden bg-[#F5F8FC] font-sans text-[#14213D] antialiased">
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -166,32 +174,34 @@ export const App: React.FC = () => {
           pendingCount={pendingCount}
           onOpenApprovals={() => setActiveTab('approvals_queue')}
           onResetComplete={handleResetComplete}
+          theme={theme}
+          onChangeTheme={setTheme}
         />
 
-        <main className="flex-1 overflow-y-auto bg-[#FAF7F2]">
+        <main className="flex-1 overflow-y-auto bg-[#F5F8FC]">
           {renderActivePage()}
         </main>
 
-        {/* Persistent Global Editorial Footer (VITRINE Style) */}
-        <footer className="border-t border-[#E6E0D3] bg-white px-6 py-2.5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#78716C] shrink-0 select-none">
+        {/* Persistent Global Retail Footer */}
+        <footer className="border-t border-[#DCE4EE] bg-white px-6 py-2.5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#526582] shrink-0 select-none">
           <div className="flex items-center gap-2">
-            <span className="font-serif font-bold text-[#1C1917]">NEXUSTWIN AI</span>
+            <span className="font-serif font-bold text-[#14213D]">NEXUSTWIN AI</span>
             <span>·</span>
             <span>Autonomous Retail &amp; FMCG Supply Chain Operating System (1 Factory · 3 Warehouses · 6 Stores)</span>
           </div>
           <div className="hidden lg:flex items-center gap-3 font-medium">
-            <span className="flex items-center gap-1.5 text-[#2D6A4F]">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#2D6A4F]" />
+            <span className="flex items-center gap-1.5 text-[#0D7A5F]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#0D7A5F]" />
               4-Gate Math Critic Verified
             </span>
             <span>·</span>
-            <span className="flex items-center gap-1.5 text-[#7B2D53]">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#7B2D53]" />
+            <span className="flex items-center gap-1.5 text-[#0E5A8A]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#0E5A8A]" />
               Multi-Agent MCP Discovery
             </span>
             <span>·</span>
-            <span className="flex items-center gap-1.5 text-[#B7791F]">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#B7791F]" />
+            <span className="flex items-center gap-1.5 text-[#C27803]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#C27803]" />
               A2A Executive Governance
             </span>
           </div>
