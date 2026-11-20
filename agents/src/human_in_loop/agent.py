@@ -1,11 +1,23 @@
-"""Remote A2A Human-in-the-Loop Approval Agent (human_in_loop).
+"""Remote A2A Human-in-the-Loop Governance Agent (human_in_loop / approval_agent).
 
-Handles high-value supply chain replenishment approvals where estimated freight
-cost exceeds the $1,000.00 autonomous execution threshold (Rule 4 of the
-Supply Chain Feasibility Gate).
+Exposed on Google Cloud Run via Google ADK `to_a2a(root_agent)` at:
+  https://nexustwin-backend-311231946335.us-central1.run.app/a2a/human_in_loop
 
-Uses Google ADK `LongRunningFunctionTool` to pause execution across distributed
-A2A agent boundaries until human VP Supply Chain authorization is received.
+Protocol Lifecycle:
+  1. PAUSE (`input-required`):
+     When `twin_supervisor` (on Vertex AI Agent Engine) transfers a Gate-4 escalation (> $1,000
+     or External B2B FMCG Purchase Order), `approval_agent` invokes
+     `LongRunningFunctionTool(func=ask_for_approval)`.
+     This persists a durable ticket in Cloud Firestore (`a2a_approval_queue`) with
+     `a2a_task_state = "input-required"` and returns immediately so the UI renders the full
+     verified business case without blocking.
+  2. RESUME (`completed`):
+     When the Retail VP clicks "Approve & Dispatch Order" in Tab 5, the backend resumes the
+     paused Vertex AI Agent Engine session (`vertex_session_id`), delivering the VP's approval
+     decision + signed `vp_approval_token` (`SIG-VP-...`) back to this Remote A2A Agent.
+     `approval_agent` then calls `erp-inventory-mcp:create_fmcg_purchase_order` (or
+     `create_transfer_order`) over MCP with `vp_approval_token` to commit the real order to
+     BigQuery & Firestore!
 """
 
 import os
@@ -15,13 +27,11 @@ from pathlib import Path
 from typing import Any, Optional
 from dotenv import load_dotenv
 
-# Load .env from `human_in_loop/.env` or `agents/.env`
 for _p in Path(__file__).resolve().parents:
     if (_p / ".env").exists():
         load_dotenv(_p / ".env", override=True)
         break
 
-# Add parent directories containing `shared` to sys.path (works both locally and in /code/ inside Agent Engine)
 for _p in Path(__file__).resolve().parents:
     if (_p / "shared").exists() and str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
@@ -29,21 +39,43 @@ for _p in Path(__file__).resolve().parents:
 
 try:
     from shared.bq_lakehouse import bq_lakehouse
+    from shared.topology import get_node_display_name
 except Exception:
     bq_lakehouse = None
+    def get_node_display_name(node_id: str) -> str:
+        return node_id
 
 from google.adk.agents.llm_agent import Agent
 from google.adk.models import Gemini
 from google.adk.tools.long_running_tool import LongRunningFunctionTool
+from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset
+from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPConnectionParams
 from google.adk.tools.tool_context import ToolContext
 from google.genai import types
 
+PUBLIC_BACKEND_URL = os.getenv(
+    "PUBLIC_BACKEND_URL",
+    "https://nexustwin-backend-311231946335.us-central1.run.app",
+).rstrip("/")
+
 AGENT_CARD_URL = os.getenv(
     "A2A_AGENT_CARD_URL",
-    "http://localhost:8001/a2a/human_in_loop/.well-known/agent-card.json",
+    f"{PUBLIC_BACKEND_URL}/a2a/human_in_loop/.well-known/agent-card.json",
 )
 
-# Shared ledger of A2A HITL tickets created by `ask_for_approval` and finalized by `approve_replenishment_sto`
+_erp_url = os.getenv("MCP_ERP_URL", "https://erp-inventory-mcp-zjhvvbsjwa-uc.a.run.app/mcp").rstrip("/")
+if not _erp_url.endswith("/mcp"):
+    _erp_url = f"{_erp_url}/mcp"
+
+ApprovalErpMCP_Tool = MCPToolset(
+    connection_params=StreamableHTTPConnectionParams(
+        url=_erp_url,
+        timeout=30.0,
+    ),
+    errlog=None,
+)
+
+# In-process mirror alongside durable Cloud Firestore `a2a_approval_queue`
 A2A_PENDING_TICKETS: dict[str, dict[str, Any]] = {}
 
 
@@ -54,144 +86,98 @@ def ask_for_approval(
     donor_dc: str = "FMCG-PLANT-TX01",
     target_store: str = "STORE-HOU-05",
     units: int = 1800,
+    freight_cost: float = 1850.0,
+    merchandise_cost: float = 15822.0,
+    event_id: str = "",
     tool_context: Optional[ToolContext] = None,
 ) -> dict[str, Any]:
-    """Ask for VP Supply Chain human-in-the-loop approval for high-value replenishment or External FMCG PO (> $1,000)."""
-    # Deduplicate existing pending ticket for the same store + SKU so repeated scenario runs do not create duplicate cards
-    existing_event_id = None
+    """Raise a durable A2A HITL VP approval ticket in Firestore and pause (`input-required`)."""
+    is_fmcg = "FMCG" in (donor_dc or "").upper() or float(merchandise_cost) > 0
+    order_type = "PO_TO_FMCG" if is_fmcg else "STO_FROM_DC"
+    prefix = "HITL-PO" if is_fmcg else "HITL-STO"
+
+    resolved_event_id = event_id or (
+        "evt_shop2_fmcg_po_hitl" if target_store == "STORE-HOU-05" else f"evt_hitl_{os.urandom(3).hex()}"
+    )
+
+    # Deduplicate existing pending ticket for same store + SKU
     existing_ticket_id = None
-    for k, existing in list(A2A_PENDING_TICKETS.items()):
-        if existing.get("store_id") == target_store and existing.get("sku_id") == sku_id and existing.get("status") == "pending":
-            existing_event_id = k
-            existing_ticket_id = existing.get("ticket_id")
+    existing_tickets = bq_lakehouse.list_a2a_tickets() if bq_lakehouse else list(A2A_PENDING_TICKETS.values())
+    for t in existing_tickets:
+        if t.get("store_id") == target_store and t.get("sku_id") == sku_id and t.get("status") == "pending":
+            resolved_event_id = t.get("event_id", resolved_event_id)
+            existing_ticket_id = t.get("ticket_id")
             break
 
-    ticket_id = existing_ticket_id or f"HITL-STO-{os.urandom(2).hex().upper()}"
-    event_id = existing_event_id or (
-        "evt_shop2_fmcg_po_hitl" if target_store == "STORE-HOU-05" else f"evt_tx_{ticket_id.lower()}"
-    )
+    ticket_id = existing_ticket_id or f"{prefix}-{os.urandom(2).hex().upper()}"
+    total_amt = round(float(amount), 2)
+    freight_val = round(float(freight_cost), 2)
+    merch_val = round(float(merchandise_cost), 2)
+    if is_fmcg and merch_val == 0.0 and total_amt > freight_val:
+        merch_val = round(total_amt - freight_val, 2)
+
     reason_msg = (
-        f"Total commitment (${amount:,.2f}) for {purpose} exceeds the $1,000.00 autonomy threshold. "
-        f"Awaiting VP Supply Chain authorization for ticket {ticket_id}."
+        f"Gates 1-3 passed (ATP, Delivery SLA, Profit ROI verified). Gate 4 paused for Retail VP sign-off: "
+        f"{'External B2B FMCG PO ' if is_fmcg else ''}total commitment (${total_amt:,.2f}) exceeds the "
+        f"$1,000.00 autonomous cap. Ticket {ticket_id} awaiting approval in Tab 5."
     )
-    A2A_PENDING_TICKETS[event_id] = {
-        "event_id": event_id,
+
+    ticket_record = {
+        "event_id": resolved_event_id,
         "ticket_id": ticket_id,
+        "order_type": order_type,
         "agent_name": "approval_agent",
         "agent_card_url": AGENT_CARD_URL,
         "a2a_task_state": "input-required",
         "tool_invoked": "LongRunningFunctionTool(ask_for_approval)",
         "store_id": target_store,
+        "store_display_name": get_node_display_name(target_store),
         "donor_dc": donor_dc,
+        "donor_display_name": get_node_display_name(donor_dc),
         "sku_id": sku_id,
-        "units": units,
-        "freight_cost": 1850.0 if "FMCG" in donor_dc.upper() and amount > 2000 else amount,
-        "fmcg_po_merchandise_cost": max(0.0, amount - 1850.0) if "FMCG" in donor_dc.upper() and amount > 2000 else 0.0,
-        "total_financial_commitment": amount,
-        "freight_mode": "FMCG_DIRECT_EXPEDITED_PO" if "FMCG" in donor_dc.upper() else "EXPEDITED_AIR_FREIGHT",
+        "units": int(units),
+        "freight_cost": freight_val,
+        "fmcg_po_merchandise_cost": merch_val,
+        "total_financial_commitment": total_amt,
+        "freight_mode": "FMCG_DIRECT_EXPEDITED_PO" if is_fmcg else "EXPEDITED_AIR_FREIGHT",
         "carrier": (
             "HydroBoost Cold-Chain Direct Carrier (FMCG PO)"
-            if "FMCG" in donor_dc.upper()
+            if is_fmcg
             else "LoneStar Expedited Air Cargo"
         ),
         "carrier_name": (
             "HydroBoost Cold-Chain Direct Carrier (FMCG PO)"
-            if "FMCG" in donor_dc.upper()
+            if is_fmcg
             else "LoneStar Expedited Air Cargo"
         ),
         "reason": reason_msg,
         "status": "pending",
         "sap_transfer_order_id": None,
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
-    # Persist PENDING_HUMAN_APPROVAL ticket to BigQuery (`supply_chain_lakehouse.audit_decision_ledger`)
+
+    A2A_PENDING_TICKETS[resolved_event_id] = ticket_record
     if bq_lakehouse is not None:
         try:
-            bq_lakehouse.record_order_execution({
-                "order_id": ticket_id,
-                "event_id": event_id,
-                "order_type": "PO_TO_FMCG" if "FMCG" in donor_dc.upper() else "STO_FROM_DC",
-                "source_node": donor_dc,
-                "target_store": target_store,
-                "sku_id": sku_id,
-                "units": units,
-                "freight_cost": 1850.0 if "FMCG" in donor_dc.upper() else amount,
-                "merchandise_cost": max(0.0, amount - 1850.0) if "FMCG" in donor_dc.upper() else 0.0,
-                "total_cost": amount,
-                "gate_status": "PENDING_HUMAN_APPROVAL",
-                "signal_source": "A2A_REMOTE_AGENT_HANDOVER",
-            })
-        except Exception:
-            pass
+            bq_lakehouse.save_a2a_ticket(ticket_record)
+        except Exception as e:
+            print(f"[A2A approval_agent] Firestore ticket save note: {e}")
 
     return {
         "status": "pending",
-        "ticket-id": ticket_id,
-        "event_id": event_id,
-        "amount": amount,
+        "a2a_task_state": "input-required",
+        "ticket_id": ticket_id,
+        "event_id": resolved_event_id,
+        "order_type": order_type,
+        "amount": total_amt,
+        "freight_cost": freight_val,
+        "merchandise_cost": merch_val,
         "purpose": purpose,
         "sku_id": sku_id,
         "donor_dc": donor_dc,
         "target_store": target_store,
-        "units": units,
-        "bigquery_ledger_table": "nexustwinai-project.supply_chain_lakehouse.audit_decision_ledger",
+        "units": int(units),
         "message": reason_msg,
-    }
-
-
-def approve_replenishment_sto(
-    purpose: str,
-    amount: float,
-    sku_id: str = "SKU-4089-HYDRATE",
-    donor_dc: str = "FMCG-PLANT-TX01",
-    target_store: str = "STORE-HOU-05",
-    units: int = 1800,
-) -> dict[str, Any]:
-    """Commit the approved replenishment Stock Transfer Order (STO) or External FMCG Purchase Order (PO) to SAP S/4HANA & BigQuery."""
-    is_fmcg_po = "FMCG" in donor_dc.upper() or "FMCG" in purpose.upper() or "PO" in purpose.upper()
-    prefix = "PO-FMCG" if is_fmcg_po else "STO-SAP"
-    order_id = f"{prefix}-{os.urandom(3).hex().upper()}"
-
-    # Mark matching pending tickets as approved
-    for ticket in A2A_PENDING_TICKETS.values():
-        if ticket["status"] == "pending":
-            ticket["status"] = "approved"
-            ticket["a2a_task_state"] = "completed"
-            ticket["sap_transfer_order_id"] = order_id
-
-    # Commit approved order & update inventory positions in BigQuery (`supply_chain_lakehouse`)
-    if bq_lakehouse is not None:
-        try:
-            bq_lakehouse.record_order_execution({
-                "order_id": order_id,
-                "event_id": f"evt_approved_{order_id.lower()}",
-                "order_type": "PO_TO_FMCG" if is_fmcg_po else "STO_FROM_DC",
-                "source_node": donor_dc,
-                "target_store": target_store,
-                "sku_id": sku_id,
-                "units": units,
-                "freight_cost": 1850.0 if is_fmcg_po else amount,
-                "merchandise_cost": max(0.0, amount - 1850.0) if is_fmcg_po else 0.0,
-                "total_cost": amount,
-                "gate_status": "APPROVED_BY_HUMAN_VP",
-                "signal_source": "A2A_HITL_APPROVAL",
-            })
-        except Exception:
-            pass
-
-    return {
-        "status": "ok",
-        "order_type": "PO_TO_FMCG" if is_fmcg_po else "STO_FROM_DC",
-        "sap_transfer_order_id": order_id,
-        "fmcg_purchase_order_id": order_id if is_fmcg_po else None,
-        "bigquery_ledger_table": "nexustwinai-project.supply_chain_lakehouse.audit_decision_ledger",
-        "amount": amount,
-        "purpose": purpose,
-        "sku_id": sku_id,
-        "donor_dc": donor_dc,
-        "target_store": target_store,
-        "units": units,
     }
 
 
@@ -207,31 +193,38 @@ root_agent = Agent(
     ),
     name="approval_agent",
     description=(
-        "Supply Chain Governance & Human-in-the-Loop Approval Agent for NexusTwin AI. "
-        "Handles replenishment stock transfers and external FMCG Purchase Orders exceeding $1,000.00."
+        "Remote A2A Supply Chain Governance & Human-in-the-Loop VP Approval Agent. "
+        "Pauses External B2B FMCG Purchase Orders and high-value transfers (> $1,000) "
+        "with state `input-required`, then resumes to execute the real ERP MCP order once "
+        "the Retail VP provides a signed `vp_approval_token`."
     ),
     instruction="""
-      You are the Supply Chain Governance & Human-in-the-Loop Approval Agent
-      (`approval_agent`) for NexusTwin AI. You handle replenishment stock transfer
-      requests (`STO_FROM_DC`) and External FMCG Purchase Orders (`PO_TO_FMCG`)
-      where the total expenditure is greater than $1,000.00.
+You are the Remote A2A Supply Chain Governance & VP Approval Agent (`approval_agent`) for NexusTwin AI.
 
-      Workflow:
-      1. When you receive a replenishment or FMCG Purchase Order request with cost > $1,000.00,
-         first call `ask_for_approval()` with the purpose, total amount, SKU (`SKU-4089-HYDRATE`),
-         source node (`donor_dc`, e.g., `FMCG-PLANT-TX01` or `DC-ATX-02`), target store, and unit
-         quantity to pause execution and wait for VP Supply Chain human approval.
-         Clearly report the generated ticket ID (`HITL-STO-...`) and ask the human approver
-         to reply with their approval confirmation.
-      2. Once the human approver confirms and approves the pending request, call
-         `approve_replenishment_sto()` to finalize and issue the SAP S/4HANA Stock Transfer
-         Order (`STO-SAP-...`) or External FMCG Purchase Order (`PO-FMCG-...`), and report
-         the issued order ID clearly.
-      3. If the human approver rejects the request, report that the order was declined.
-    """,
+Workflow — TWO PHASES:
+
+PHASE 1 — WHEN A NEW GATE-4 ESCALATION ARRIVES (NO VP APPROVAL TOKEN YET):
+1. Call `ask_for_approval(...)` with exact values (`purpose`, `amount`, `sku_id`, `donor_dc`,
+   `target_store`, `units`, `freight_cost`, `merchandise_cost`, `event_id`).
+2. DO NOT call `create_fmcg_purchase_order` or `create_transfer_order` yet!
+3. Immediately return a clear summary including the exact `ticket_id` (e.g. `HITL-PO-...`),
+   `a2a_task_state: "input-required"`, and confirm that Gates 1-3 passed while Gate 4 is waiting
+   for Retail VP sign-off in Tab 5.
+
+PHASE 2 — WHEN HUMAN VP APPROVAL INPUT + `vp_approval_token` (prefix `SIG-`) ARRIVES:
+1. Verify the approval message contains `APPROVED` and a signed `vp_approval_token` (e.g. `SIG-VP-...`).
+2. Resume the workflow by calling the live `erp-inventory-mcp` tool directly:
+   - For External FMCG PO (`PO_TO_FMCG` / `FMCG-PLANT-TX01`): call
+     `create_fmcg_purchase_order(target_store, serving_dc, sku, quantity, freight_cost_usd, vp_approval_token, fmcg_vendor_id="FMCG-PLANT-TX01", event_id=...)`.
+   - For Internal DC STO (`STO_FROM_DC`): call
+     `create_transfer_order(from_dc, to_location, sku, quantity, freight_cost_usd, vp_approval_token, event_id=...)`.
+3. Report the confirmed live `PO-FMCG-...` or `STO-SAP-...` order ID, updated BigQuery inventory balance,
+   and `a2a_task_state: "completed"`.
+4. If the VP rejects the request, do NOT call any ERP write tool and report that the order was declined.
+""",
     tools=[
-        approve_replenishment_sto,
         LongRunningFunctionTool(func=ask_for_approval),
+        ApprovalErpMCP_Tool,
     ],
     generate_content_config=types.GenerateContentConfig(temperature=0.1),
 )

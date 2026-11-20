@@ -16,15 +16,21 @@ if _env_file.exists():
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "NexusTwin AI - Cognitive Agent Bridge"
-    VERSION: str = "1.0.0"
+    VERSION: str = "2.0.0"
     API_V1_PREFIX: str = "/api/v1"
     PORT: int = int(os.getenv("PORT", "8080"))
     HOST: str = os.getenv("HOST", "0.0.0.0")
     CORS_ORIGINS: list[str] = ["*"]
 
-    # GCP & BigQuery Lakehouse Configuration
+    # GCP, BigQuery Lakehouse & Cloud Firestore Configuration
     GCP_PROJECT_ID: str = os.getenv("GCP_PROJECT_ID", os.getenv("GOOGLE_CLOUD_PROJECT", "nexustwinai-project"))
     BQ_DATASET_ID: str = os.getenv("BQ_DATASET_ID", "supply_chain_lakehouse")
+
+    # Public Cloud Run URL for RemoteA2aAgent card & A2A JSON-RPC
+    PUBLIC_BACKEND_URL: str = os.getenv(
+        "PUBLIC_BACKEND_URL",
+        "https://nexustwin-backend-311231946335.us-central1.run.app",
+    )
 
     # Deployed Vertex AI Agent Engine Configuration
     AGENT_ENGINE_REGION: str = os.getenv("AGENT_ENGINE_REGION", "us-central1")
@@ -33,10 +39,16 @@ class Settings(BaseSettings):
         "projects/311231946335/locations/us-central1/reasoningEngines/6418419193229606912",
     )
 
-    # Remote A2A HITL Agent Endpoint (Port 8001)
+    # Cloud Run FastMCP Endpoint (used by embedded A2A approval_agent & VP fallback)
+    MCP_ERP_URL: str = os.getenv(
+        "MCP_ERP_URL",
+        "https://erp-inventory-mcp-zjhvvbsjwa-uc.a.run.app/mcp",
+    )
+
+    # Remote A2A HITL Agent Base URL
     A2A_APPROVAL_AGENT_BASE_URL: str = os.getenv(
         "A2A_APPROVAL_AGENT_BASE_URL",
-        "http://localhost:8001/a2a/human_in_loop",
+        "https://nexustwin-backend-311231946335.us-central1.run.app/a2a/human_in_loop",
     )
 
     # 4-Rule Feasibility Gate Thresholds

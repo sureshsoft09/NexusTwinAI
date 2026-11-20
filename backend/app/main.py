@@ -1,11 +1,11 @@
-"""NexusTwin AI - FastAPI Agent Bridge Core.
+"""NexusTwin AI - FastAPI Agent Bridge & Cloud Run Remote A2A Governance Host.
 
 Bridges:
-  1. Inbound POS scanner streams, 25-Day Weather API & Social Media feeds
-  2. Google ADK Multi-Agent System (root_agent = twin_supervisor) & Vertex AI Agent Engine
-  3. FastMCP Streamable HTTP Microservices on Cloud Run
-  4. A2A Human-in-the-Loop Governance endpoints (`/a2a/human_in_loop/*`)
-  5. React 18 Command & Control Dashboard
+  1. Speed-controlled Live POS / 25-Day Weather / Social Media telemetry streaming (Firestore + BigQuery)
+  2. Google ADK Multi-Agent System on Vertex AI Agent Engine (`twin_supervisor`)
+  3. Cloud Run FastMCP Microservices (`erp-inventory-mcp`, `bigquery-telemetry-mcp`, `logistics-rates-mcp`)
+  4. Official Google ADK `to_a2a(approval_agent)` Remote A2A Server mounted at `/a2a/human_in_loop`
+  5. React 18 Control Tower Dashboard (Firebase Hosting)
 """
 
 import os
@@ -13,7 +13,8 @@ import sys
 from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import Any, Dict
-from fastapi import FastAPI, Request
+from urllib.parse import urlparse
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
@@ -36,28 +37,59 @@ from backend.app.api.signals import router as signals_router
 from backend.app.api.governance import router as governance_router
 from backend.app.api.twin_state import router as twin_state_router
 from backend.app.api.audit import router as audit_router
-from human_in_loop.agent import (
-    A2A_PENDING_TICKETS,
-    ask_for_approval,
-    approve_replenishment_sto,
-)
+from shared.bq_lakehouse import bq_lakehouse
+
+# Build the official Google ADK `to_a2a(approval_agent)` Starlette ASGI app for Cloud Run HTTPS
+_a2a_starlette_app = None
+_a2a_mounted_mode = "DISABLED"
+try:
+    from google.adk.a2a.utils.agent_to_a2a import to_a2a
+    from human_in_loop.agent import root_agent as approval_root_agent
+
+    _parsed = urlparse(settings.PUBLIC_BACKEND_URL)
+    _protocol = _parsed.scheme or "https"
+    _host = _parsed.hostname or "nexustwin-backend-311231946335.us-central1.run.app"
+    _port = _parsed.port or (443 if _protocol == "https" else settings.PORT)
+
+    _a2a_starlette_app = to_a2a(
+        approval_root_agent,
+        host=_host,
+        port=_port,
+        protocol=_protocol,
+        rpc_path="a2a/human_in_loop",
+    )
+    _a2a_mounted_mode = "OFFICIAL_ADK_TO_A2A"
+except Exception as _a2a_err:
+    print(f"[NexusTwin Backend] Warning: could not initialize ADK to_a2a(approval_agent): {_a2a_err}")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print(f"Starting {settings.PROJECT_NAME} v{settings.VERSION} on port {settings.PORT}...")
-    yield
+    if _a2a_starlette_app is not None:
+        async with _a2a_starlette_app.router.lifespan_context(_a2a_starlette_app):
+            existing_paths = {getattr(r, "path", None) for r in app.router.routes}
+            for route in _a2a_starlette_app.routes:
+                if getattr(route, "path", None) not in existing_paths:
+                    app.router.routes.append(route)
+            print(
+                f"[A2A Server] Official Google ADK to_a2a(approval_agent) active at "
+                f"{settings.PUBLIC_BACKEND_URL}/a2a/human_in_loop/.well-known/agent-card.json"
+            )
+            yield
+    else:
+        yield
     print(f"Shutting down {settings.PROJECT_NAME}...")
 
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    description="Cognitive Multi-Agent Bridge connecting FMCG Supply Chains to Retail Shelves.",
+    description="Cognitive Multi-Agent Bridge connecting FMCG Supply Chains to Retail Shelves with Official A2A Governance.",
     lifespan=lifespan,
 )
 
-# Enable CORS for local & Cloud Run React frontend
+# Enable CORS for local & Firebase Hosting React frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -73,93 +105,26 @@ app.include_router(twin_state_router, prefix=settings.API_V1_PREFIX)
 app.include_router(audit_router, prefix=settings.API_V1_PREFIX)
 
 
-# Built-in A2A Human-in-the-Loop endpoints so Cloud Run single-container deployments
-# serve `/a2a/human_in_loop/*` natively alongside `/api/v1/*`
-@app.get("/a2a/human_in_loop/.well-known/agent.json", tags=["A2A Governance"])
-@app.get("/a2a/human_in_loop/.well-known/agent-card.json", tags=["A2A Governance"])
-async def a2a_agent_card(request: Request) -> Dict[str, Any]:
-    base_url = str(request.base_url).rstrip("/")
-    return {
-        "name": "approval_agent",
-        "description": "Executive A2A Human-in-the-Loop Governance Agent for Supply Chain Orders > $1,000",
-        "url": f"{base_url}/a2a/human_in_loop",
-        "version": "1.0.0",
-        "capabilities": {"streaming": False, "pushNotifications": False},
-        "skills": [
-            {
-                "id": "ask_for_approval",
-                "name": "Ask for Executive Approval",
-                "description": "Escalate replenishment or factory purchase orders exceeding $1,000 to VP Queue.",
-            },
-            {
-                "id": "approve_replenishment_sto",
-                "name": "Approve Replenishment Order",
-                "description": "Record executive sign-off and release order to SAP ERP.",
-            },
-        ],
-    }
-
-
 @app.get("/a2a/human_in_loop/pending", tags=["A2A Governance"])
 async def a2a_list_pending():
-    return list(A2A_PENDING_TICKETS.values())
-
-
-@app.post("/a2a/human_in_loop/reset", tags=["A2A Governance"])
-async def a2a_reset_pending():
-    A2A_PENDING_TICKETS.clear()
-    return {"status": "reset", "pending_count": 0}
-
-
-@app.post("/a2a/human_in_loop", tags=["A2A Governance"])
-@app.post("/a2a/human_in_loop/", tags=["A2A Governance"])
-async def a2a_rpc_endpoint(request: Request):
-    body = await request.json()
-    params = body.get("params", {}) if isinstance(body, dict) else {}
-    action = params.get("action", "request_approval")
-    if action == "reset":
-        A2A_PENDING_TICKETS.clear()
-        return {"jsonrpc": "2.0", "id": body.get("id", "1"), "result": {"status": "reset"}}
-
-    purpose = params.get("purpose", "High-value replenishment / FMCG PO")
-    amount = float(params.get("amount", 17672.0))
-    sku_id = params.get("sku_id", "SKU-4089-HYDRATE")
-    donor_dc = params.get("donor_dc", "FMCG-PLANT-TX01")
-    target_store = params.get("target_store", "STORE-HOU-05")
-    units = int(params.get("units", 1800))
-
-    if action == "approve":
-        res = approve_replenishment_sto(
-            purpose=purpose,
-            amount=amount,
-            sku_id=sku_id,
-            donor_dc=donor_dc,
-            target_store=target_store,
-            units=units,
-        )
-    else:
-        res = ask_for_approval(
-            purpose=purpose,
-            amount=amount,
-            sku_id=sku_id,
-            donor_dc=donor_dc,
-            target_store=target_store,
-            units=units,
-        )
-    return {"jsonrpc": "2.0", "id": body.get("id", "1"), "result": res}
+    """Return durable A2A pending & approved VP tickets from Cloud Firestore."""
+    return bq_lakehouse.list_a2a_tickets()
 
 
 @app.get("/health", tags=["Health & Status"])
-async def health_check():
+async def health_check() -> Dict[str, Any]:
     return {
         "status": "HEALTHY",
         "service": settings.PROJECT_NAME,
         "version": settings.VERSION,
         "gcp_project": settings.GCP_PROJECT_ID,
+        "firestore_connected": bq_lakehouse.fs_connected,
+        "bigquery_connected": bq_lakehouse.bq_connected,
         "bigquery_dataset": f"{settings.GCP_PROJECT_ID}.{settings.BQ_DATASET_ID}",
         "agent_engine_resource_id": settings.AGENT_ENGINE_RESOURCE_ID,
         "agent_engine_region": settings.AGENT_ENGINE_REGION,
-        "a2a_approval_agent_url": settings.A2A_APPROVAL_AGENT_BASE_URL,
+        "a2a_server_mode": _a2a_mounted_mode,
+        "a2a_agent_card_url": f"{settings.PUBLIC_BACKEND_URL.rstrip('/')}/a2a/human_in_loop/.well-known/agent-card.json",
     }
 
 

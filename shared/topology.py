@@ -1,8 +1,9 @@
 """Texas regional supply chain topology for NexusTwin AI digital twin.
 
 Covers 1 Upstream FMCG Manufacturer Plant, 3 Regional Distribution Centers (DCs),
-6 Retail Stores, Hero SKU catalog, geospatial coordinates, initial inventory allocations,
-25-day weather forecast signals, and social media / public forum signals.
+6 Retail Stores, Hero SKU catalog, unified canonical naming registry,
+healthy baseline inventory allocations, 25-day weather forecast signals,
+and social media / public forum signals.
 """
 
 import copy
@@ -11,7 +12,8 @@ from typing import Dict, Any, List
 FMCG_MANUFACTURERS: List[Dict[str, Any]] = [
     {
         "id": "FMCG-PLANT-TX01",
-        "name": "HydroBoost Texas Bottling & FMCG Plant",
+        "name": "Waco Bottling Factory (FMCG-PLANT-TX01)",
+        "short_name": "Waco Bottling Factory",
         "city": "Waco",
         "state": "TX",
         "lat": 31.5493,
@@ -20,7 +22,7 @@ FMCG_MANUFACTURERS: List[Dict[str, Any]] = [
         "wholesale_unit_cost": 8.79,
         "moq_units": 1000,
         "standard_lead_time_hours": 36.0,
-        "expedited_lead_time_hours": 12.0,
+        "expedited_lead_time_hours": 6.0,
         "role": "UPSTREAM_FMCG_MANUFACTURER",
     }
 ]
@@ -28,7 +30,8 @@ FMCG_MANUFACTURERS: List[Dict[str, Any]] = [
 REGIONAL_DCS: List[Dict[str, Any]] = [
     {
         "id": "DC-ATX-02",
-        "name": "Austin Central Distribution Center",
+        "name": "Austin Warehouse (DC-ATX-02)",
+        "short_name": "Austin Warehouse",
         "city": "Austin",
         "state": "TX",
         "lat": 30.2672,
@@ -39,7 +42,8 @@ REGIONAL_DCS: List[Dict[str, Any]] = [
     },
     {
         "id": "DC-HOU-01",
-        "name": "Houston Port Gateway DC",
+        "name": "Houston Warehouse (DC-HOU-01)",
+        "short_name": "Houston Warehouse",
         "city": "Houston",
         "state": "TX",
         "lat": 29.7604,
@@ -50,7 +54,8 @@ REGIONAL_DCS: List[Dict[str, Any]] = [
     },
     {
         "id": "DC-SAT-03",
-        "name": "San Antonio Logistics Hub",
+        "name": "San Antonio Warehouse (DC-SAT-03)",
+        "short_name": "San Antonio Warehouse",
         "city": "San Antonio",
         "state": "TX",
         "lat": 29.4241,
@@ -64,7 +69,8 @@ REGIONAL_DCS: List[Dict[str, Any]] = [
 RETAIL_STORES: List[Dict[str, Any]] = [
     {
         "id": "STORE-DAL-04",
-        "name": "Shop 1: Dallas Supercenter #104",
+        "name": "Shop 1: Dallas (STORE-DAL-04)",
+        "short_name": "Shop 1: Dallas",
         "city": "Dallas",
         "state": "TX",
         "lat": 32.7767,
@@ -75,7 +81,8 @@ RETAIL_STORES: List[Dict[str, Any]] = [
     },
     {
         "id": "STORE-HOU-05",
-        "name": "Shop 2: Houston Galleria Superstore #55",
+        "name": "Shop 2: Houston (STORE-HOU-05)",
+        "short_name": "Shop 2: Houston",
         "city": "Houston",
         "state": "TX",
         "lat": 29.7399,
@@ -86,7 +93,8 @@ RETAIL_STORES: List[Dict[str, Any]] = [
     },
     {
         "id": "STORE-PLANO-07",
-        "name": "Shop 3: Plano North Galleria #19",
+        "name": "Shop 3: Plano (STORE-PLANO-07)",
+        "short_name": "Shop 3: Plano",
         "city": "Plano",
         "state": "TX",
         "lat": 33.0198,
@@ -97,7 +105,8 @@ RETAIL_STORES: List[Dict[str, Any]] = [
     },
     {
         "id": "STORE-ARL-11",
-        "name": "Shop 4: Arlington Stadium Center #44",
+        "name": "Shop 4: Arlington (STORE-ARL-11)",
+        "short_name": "Shop 4: Arlington",
         "city": "Arlington",
         "state": "TX",
         "lat": 32.7357,
@@ -108,7 +117,8 @@ RETAIL_STORES: List[Dict[str, Any]] = [
     },
     {
         "id": "STORE-FW-02",
-        "name": "Shop 5: Fort Worth Retail Plaza #82",
+        "name": "Shop 5: Fort Worth (STORE-FW-02)",
+        "short_name": "Shop 5: Fort Worth",
         "city": "Fort Worth",
         "state": "TX",
         "lat": 32.7555,
@@ -119,7 +129,8 @@ RETAIL_STORES: List[Dict[str, Any]] = [
     },
     {
         "id": "STORE-SAT-06",
-        "name": "Shop 6: San Antonio Riverwalk Market #61",
+        "name": "Shop 6: San Antonio (STORE-SAT-06)",
+        "short_name": "Shop 6: San Antonio",
         "city": "San Antonio",
         "state": "TX",
         "lat": 29.4252,
@@ -129,6 +140,36 @@ RETAIL_STORES: List[Dict[str, Any]] = [
         "demo_role": "BASELINE_HEALTHY",
     },
 ]
+
+NODE_DISPLAY_NAMES: Dict[str, str] = {
+    item["id"]: item["name"]
+    for item in (FMCG_MANUFACTURERS + REGIONAL_DCS + RETAIL_STORES)
+}
+
+NODE_SHORT_NAMES: Dict[str, str] = {
+    item["id"]: item["short_name"]
+    for item in (FMCG_MANUFACTURERS + REGIONAL_DCS + RETAIL_STORES)
+}
+
+
+def get_node_display_name(node_id: str) -> str:
+    """Return the unified canonical display name, e.g. 'Shop 1: Dallas (STORE-DAL-04)'."""
+    if not node_id:
+        return ""
+    if node_id in NODE_DISPLAY_NAMES:
+        return NODE_DISPLAY_NAMES[node_id]
+    for known_id, full_name in NODE_DISPLAY_NAMES.items():
+        if node_id.startswith(known_id):
+            return full_name
+    return node_id
+
+
+def get_node_short_name(node_id: str) -> str:
+    """Return the unified short label, e.g. 'Shop 1: Dallas'."""
+    if not node_id:
+        return ""
+    return NODE_SHORT_NAMES.get(node_id, node_id)
+
 
 SKU_CATALOG: Dict[str, Dict[str, Any]] = {
     "SKU-4089-HYDRATE": {
@@ -163,50 +204,53 @@ SKU_CATALOG: Dict[str, Dict[str, Any]] = {
     },
 }
 
+# Calm, healthy starting baseline across all 10 network nodes (1 Factory, 3 DCs, 6 Retail Shops)
 INITIAL_INVENTORY: Dict[str, Dict[str, Any]] = {
+    # Isolated FMCG Manufacturer Inventory (BigQuery: fmcg_factory_inventory)
     "FMCG-PLANT-TX01": {
         "SKU-4089-HYDRATE": {"on_hand": 50000, "safety_buffer": 5000, "atp_surplus": 45000},
     },
-    # 3 Regional DCs
+    # 3 Regional Retail Warehouses (BigQuery: retail_erp_inventory)
     "DC-ATX-02": {
-        # Austin DC has 3,600 ATP surplus -> Easily fulfills Shop 1 (STORE-DAL-04) via internal STO
+        # Austin Warehouse has 3,600 ATP surplus -> Fulfills Shop 1 & Shop 3 via internal STO
         "SKU-4089-HYDRATE": {"on_hand": 4800, "safety_buffer": 1200, "atp_surplus": 3600},
         "SKU-1022-PROTEIN": {"on_hand": 2900, "safety_buffer": 800, "atp_surplus": 2100},
         "SKU-8821-SNACK": {"on_hand": 6500, "safety_buffer": 1500, "atp_surplus": 5000},
     },
     "DC-HOU-01": {
-        # Houston DC has only 180 ATP surplus (1,680 on hand - 1,500 safety buffer) -> Insufficient for Shop 2 (STORE-HOU-05) 1,800-unit surge!
-        # This deterministically triggers the FMCG Purchase Order (PO) flow to FMCG-PLANT-TX01.
+        # Houston Warehouse has only 180 ATP surplus (1,680 on hand - 1,500 safety reserve)
+        # -> Deterministically triggers B2B FMCG Purchase Order escalation to Waco Bottling Factory!
         "SKU-4089-HYDRATE": {"on_hand": 1680, "safety_buffer": 1500, "atp_surplus": 180},
     },
     "DC-SAT-03": {
-        # San Antonio DC has 1,600 ATP surplus -> Fulfills Shop 4 (STORE-ARL-11) social event replenishment
+        # San Antonio Warehouse has 1,600 ATP surplus -> Fulfills Shop 4 via internal STO
         "SKU-4089-HYDRATE": {"on_hand": 2500, "safety_buffer": 900, "atp_surplus": 1600},
     },
-    # 6 Retail Stores
+    # 6 Retail Shops — ALL start calm and healthy before live telemetry streaming runs
     "STORE-DAL-04": {
-        "SKU-4089-HYDRATE": {"on_hand": 180, "reserved": 0, "safety_buffer": 250, "burn_rate_base": 48.0, "current_velocity": 215.0},
+        "SKU-4089-HYDRATE": {"on_hand": 480, "reserved": 0, "safety_buffer": 250, "atp_surplus": 230, "burn_rate_base": 48.0, "current_velocity": 48.0},
     },
     "STORE-HOU-05": {
-        "SKU-4089-HYDRATE": {"on_hand": 140, "reserved": 0, "safety_buffer": 250, "burn_rate_base": 52.0, "current_velocity": 230.0},
+        "SKU-4089-HYDRATE": {"on_hand": 460, "reserved": 0, "safety_buffer": 250, "atp_surplus": 210, "burn_rate_base": 52.0, "current_velocity": 52.0},
     },
     "STORE-PLANO-07": {
-        "SKU-4089-HYDRATE": {"on_hand": 520, "reserved": 0, "safety_buffer": 220, "burn_rate_base": 40.0, "current_velocity": 42.0},
+        "SKU-4089-HYDRATE": {"on_hand": 520, "reserved": 0, "safety_buffer": 220, "atp_surplus": 300, "burn_rate_base": 40.0, "current_velocity": 40.0},
     },
     "STORE-ARL-11": {
-        "SKU-4089-HYDRATE": {"on_hand": 310, "reserved": 0, "safety_buffer": 240, "burn_rate_base": 44.0, "current_velocity": 165.0},
+        "SKU-4089-HYDRATE": {"on_hand": 490, "reserved": 0, "safety_buffer": 240, "atp_surplus": 250, "burn_rate_base": 44.0, "current_velocity": 44.0},
     },
     "STORE-FW-02": {
-        "SKU-4089-HYDRATE": {"on_hand": 640, "reserved": 0, "safety_buffer": 250, "burn_rate_base": 42.0, "current_velocity": 44.0},
+        "SKU-4089-HYDRATE": {"on_hand": 640, "reserved": 0, "safety_buffer": 250, "atp_surplus": 390, "burn_rate_base": 42.0, "current_velocity": 42.0},
     },
     "STORE-SAT-06": {
-        "SKU-4089-HYDRATE": {"on_hand": 590, "reserved": 0, "safety_buffer": 200, "burn_rate_base": 38.0, "current_velocity": 39.0},
+        "SKU-4089-HYDRATE": {"on_hand": 590, "reserved": 0, "safety_buffer": 200, "atp_surplus": 390, "burn_rate_base": 38.0, "current_velocity": 38.0},
     },
 }
 
 WEATHER_FORECAST_SIGNALS: Dict[str, Dict[str, Any]] = {
     "STORE-PLANO-07": {
         "store_id": "STORE-PLANO-07",
+        "store_display_name": "Shop 3: Plano (STORE-PLANO-07)",
         "city": "Plano, TX",
         "lat": 33.0198,
         "lng": -96.6989,
@@ -223,6 +267,7 @@ WEATHER_FORECAST_SIGNALS: Dict[str, Dict[str, Any]] = {
     },
     "STORE-DAL-04": {
         "store_id": "STORE-DAL-04",
+        "store_display_name": "Shop 1: Dallas (STORE-DAL-04)",
         "city": "Dallas, TX",
         "lat": 32.7767,
         "lng": -96.7970,
@@ -244,9 +289,10 @@ SOCIAL_MEDIA_SIGNALS: List[Dict[str, Any]] = [
         "signal_id": "SOC-TX-8801",
         "platform": "Reddit (r/arlington & r/dfwrunning)",
         "store_id": "STORE-ARL-11",
+        "store_display_name": "Shop 4: Arlington (STORE-ARL-11)",
         "sku_id": "SKU-4089-HYDRATE",
         "author": "u/DFWMarathonOfficial",
-        "post_text": "🔥 18,500 runners registered for the Arlington Stadium Charity Marathon! Official trackside hydration partner: HydroBoost Electro-Electrolyte 12-Packs — grab yours at Arlington Stadium Center #44!",
+        "post_text": "18,500 runners registered for the Arlington Stadium Charity Marathon! Official trackside hydration partner: HydroBoost Electro-Electrolyte 12-Packs — grab yours at Shop 4: Arlington (STORE-ARL-11)!",
         "hashtags": ["#ArlingtonMarathon", "#HydroBoost", "#TexasRunners", "#Electrolytes"],
         "mention_velocity_per_hr": 420,
         "viral_buzz_score": 94.5,
@@ -259,9 +305,10 @@ SOCIAL_MEDIA_SIGNALS: List[Dict[str, Any]] = [
         "signal_id": "SOC-TX-8802",
         "platform": "X / Public Community Forum",
         "store_id": "STORE-HOU-05",
+        "store_display_name": "Shop 2: Houston (STORE-HOU-05)",
         "sku_id": "SKU-4089-HYDRATE",
         "author": "@HoustonFitnessClub",
-        "post_text": "Shelves of HydroBoost Electrolyte 12-packs disappearing fast at Houston Galleria Superstore #55 ahead of the Gulf Coast CrossFit Finals!",
+        "post_text": "Shelves of HydroBoost Electrolyte 12-packs disappearing fast at Shop 2: Houston (STORE-HOU-05) ahead of the Gulf Coast CrossFit Finals!",
         "hashtags": ["#HoustonFitness", "#HydroBoost", "#StockAlert"],
         "mention_velocity_per_hr": 310,
         "viral_buzz_score": 89.0,
@@ -274,5 +321,5 @@ SOCIAL_MEDIA_SIGNALS: List[Dict[str, Any]] = [
 
 
 def get_fresh_inventory() -> Dict[str, Dict[str, Any]]:
-    """Return a deep copy of the baseline inventory for demo reset."""
+    """Return a deep copy of the healthy baseline inventory for demo reset."""
     return copy.deepcopy(INITIAL_INVENTORY)

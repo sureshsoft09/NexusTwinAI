@@ -1,7 +1,7 @@
-"""Market Signals, 4-Act Demo Scenario, and Live Vertex AI Agent Engine Query API Router."""
+"""Market Signals, Speed-Controlled Telemetry Stream Scenarios, and Live Vertex AI Agent Engine API Router."""
 
 from typing import Any, Dict, Optional
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 try:
@@ -23,7 +23,7 @@ class AgentQueryRequest(BaseModel):
 
 @router.post("/ingest", response_model=ReplenishmentDecisionManifest)
 async def ingest_market_signal(event: MarketSignalEvent):
-    """Ingest POS scanner velocity, 25-day Weather API forecast, or Social Media signal and trigger NexusTwin AI Multi-Agent System + 4-Rule Gate."""
+    """Ingest POS scanner velocity, 25-day Weather API forecast, or Social Media signal and trigger NexusTwin AI Multi-Agent System."""
     try:
         manifest = await twin_service.ingest_market_signal(event, broadcast_fn=manager.broadcast)
         await manager.broadcast({
@@ -39,11 +39,12 @@ async def ingest_market_signal(event: MarketSignalEvent):
 
 @router.post("/query-agent")
 async def query_deployed_agent_engine(req: AgentQueryRequest) -> Dict[str, Any]:
-    """Query the deployed Vertex AI Agent Engine (`projects/311231946335/locations/us-central1/reasoningEngines/6418419193229606912`) directly with any prompt."""
+    """Query the deployed Vertex AI Agent Engine directly with any prompt."""
     try:
         res = await twin_service.query_remote_agent(
             prompt=req.prompt,
             user_id=req.user_id or "supply_chain_planner_01",
+            broadcast_fn=manager.broadcast,
         )
         await manager.broadcast({
             "type": "AGENT_QUERY_COMPLETED",
@@ -66,11 +67,28 @@ async def list_demo_scenarios():
     }
 
 
+@router.post("/stop")
+async def stop_active_stream():
+    """Request cancellation of any currently running telemetry simulation stream."""
+    twin_service.request_stop_stream()
+    await manager.broadcast({"type": "STREAM_STOPPED"})
+    return {"status": "STOP_REQUESTED"}
+
+
 @router.post("/scenario/{scenario_key}", response_model=ReplenishmentDecisionManifest)
-async def trigger_demo_scenario_endpoint(scenario_key: str):
-    """Trigger one of the 4 demo flows (shop1_pos_dc_replenish, shop2_dc_shortage_fmcg_po, shop3_weather_25day_prediction, shop4_social_media_event_spike)."""
+async def trigger_demo_scenario_endpoint(
+    scenario_key: str,
+    speed: float = Query(default=1.0, ge=0.25, le=4.0, description="Telemetry stream playback speed (0.5=Slow, 1.0=Normal, 2.0=Fast)"),
+):
+    """Run live DB-backed telemetry stream at `speed` -> detect spike -> trigger live Vertex AI Agent Engine
+    + 4-Gate Guardrail + Real Cloud Run MCPs / RemoteA2aAgent.
+    """
     try:
-        manifest = await twin_service.trigger_demo_scenario(scenario_key, broadcast_fn=manager.broadcast)
+        manifest = await twin_service.trigger_demo_scenario(
+            scenario_key,
+            broadcast_fn=manager.broadcast,
+            speed=speed,
+        )
         await manager.broadcast({
             "type": "SIGNAL_RESOLVED",
             "scenario_key": scenario_key,

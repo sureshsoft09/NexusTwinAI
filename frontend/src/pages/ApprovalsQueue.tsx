@@ -1,16 +1,20 @@
 import React, { useState } from 'react';
 import { CheckCircle2, UserCheck, Clock, RefreshCw, ShieldCheck, Factory } from 'lucide-react';
+import { getNodeDisplayName } from '../nodeCatalog';
 
 export interface A2AApprovalCard {
   ticket_id: string;
   event_id: string;
+  order_type?: string;
   agent_name: string;
   agent_card_url: string;
   a2a_task_state: string;
   tool_invoked: string;
   status: string;
   store_id: string;
+  store_display_name?: string;
   donor_dc?: string;
+  donor_display_name?: string;
   sku_id: string;
   units: number;
   freight_cost: number;
@@ -22,31 +26,16 @@ export interface A2AApprovalCard {
   created_at: string;
   sap_order_id?: string;
   sap_transfer_order_id?: string;
+  vertex_session_id?: string;
+  vp_approval_token?: string;
+  a2a_resume_response?: string;
+  gate_rules_verified?: Array<{
+    rule_name: string;
+    passed: boolean;
+    formula_expression?: string;
+    message?: string;
+  }>;
 }
-
-export const DEFAULT_FALLBACK_CARDS: A2AApprovalCard[] = [
-  {
-    ticket_id: 'PO-REQ-HOU-1800',
-    event_id: 'evt_shop2_fmcg_po_hitl',
-    agent_name: 'VP Supply Chain Approval Gate',
-    agent_card_url: 'http://localhost:8001/a2a/human_in_loop/.well-known/agent.json',
-    a2a_task_state: 'Awaiting Manager Signature',
-    tool_invoked: 'Factory Purchase Order Approval',
-    status: 'pending',
-    store_id: 'STORE-HOU-05',
-    donor_dc: 'FMCG-PLANT-TX01 (via DC-HOU-01)',
-    sku_id: 'SKU-4089-HYDRATE',
-    units: 1800,
-    freight_cost: 1850.0,
-    fmcg_po_merchandise_cost: 15822.0,
-    total_financial_commitment: 17672.0,
-    freight_mode: 'Direct Factory Cold-Chain Truck ($15,822 Product + $1,850 Shipping)',
-    carrier: 'HydroBoost Direct Cold-Chain Carrier',
-    reason:
-      'Houston Warehouse (DC-HOU-01) only has 180 spare packs—not enough for Houston Galleria Store’s 1,800-pack surge. The AI prepared a direct Factory Purchase Order to Waco Bottling Factory ($17,672 total / $1,850 shipping) which requires VP approval because it exceeds the $1,000 automatic limit.',
-    created_at: '2026-11-06T12:45:00Z',
-  },
-];
 
 interface ApprovalsQueueProps {
   cards: A2AApprovalCard[];
@@ -55,21 +44,6 @@ interface ApprovalsQueueProps {
   onApproveCard: (eventId: string) => Promise<void>;
   onRefreshCards: () => Promise<void>;
 }
-
-const STORE_FRIENDLY_NAME: Record<string, string> = {
-  'STORE-HOU-05': 'Shop 2: Houston Galleria Store (STORE-HOU-05)',
-  'STORE-DAL-04': 'Shop 1: Dallas Uptown Store (STORE-DAL-04)',
-  'STORE-PLANO-07': 'Shop 3: Plano Legacy Store (STORE-PLANO-07)',
-  'STORE-ARL-11': 'Shop 4: Arlington Stadium Store (STORE-ARL-11)',
-};
-
-const SOURCE_FRIENDLY_NAME: Record<string, string> = {
-  'FMCG-PLANT-TX01': 'Waco Bottling Factory (FMCG-PLANT-TX01)',
-  'FMCG-PLANT-TX01 (via DC-HOU-01)': 'Waco Bottling Factory (because Houston Warehouse only has 180 spare packs)',
-  'DC-ATX-02': 'Austin Regional Warehouse (DC-ATX-02)',
-  'DC-HOU-01': 'Houston Regional Warehouse (DC-HOU-01)',
-  'DC-SAT-03': 'San Antonio Regional Warehouse (DC-SAT-03)',
-};
 
 export const ApprovalsQueue: React.FC<ApprovalsQueueProps> = ({
   cards,
@@ -104,10 +78,10 @@ export const ApprovalsQueue: React.FC<ApprovalsQueueProps> = ({
       <div className="bg-white border border-[#DCE4EE] rounded-2xl p-5 shadow-enterprise flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="font-serif text-lg font-bold text-[#14213D]">
-            Manager Sign-Off Queue (Orders Over $1,000 Auto-Approval Cap)
+            Manager Sign-Off Queue — Cloud Run Remote A2A Governance (Firestore Queue)
           </h1>
           <p className="text-xs text-[#526582] mt-1">
-            Routine warehouse transfers &le; $1,000 ship automatically. Larger orders or direct Factory Purchase Orders pause here for 1-click VP approval.
+            Internal Retail STOs &le; $1,000 execute autonomously. High-value or External B2B FMCG Purchase Orders pause via <strong>RemoteA2aAgent</strong> (`input-required`) after Gates 1–3 pass, then <strong>resume the exact paused Vertex AI session</strong> upon VP sign-off.
           </p>
         </div>
         <div className="flex items-center space-x-3 shrink-0">
@@ -130,29 +104,29 @@ export const ApprovalsQueue: React.FC<ApprovalsQueueProps> = ({
         <div className="flex items-center space-x-2 mb-3">
           <ShieldCheck className="h-4 w-4 text-[#0E5A8A]" />
           <h2 className="font-serif text-sm font-bold text-[#14213D]">
-            The 4 Mathematical Safety Checks Verified Before Any Order Reaches This Queue
+            In-Loop 4-Gate Guardrail Verified BEFORE Any Order Reaches VP Sign-Off
           </h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
-          <div className="bg-[#F5F8FC] p-3.5 rounded-xl border border-[#DCE4EE] space-y-1">
-            <span className="text-[#0E5A8A] font-bold">Math Check 1 • Spare Stock</span>
+          <div className="bg-[#EEFBF6] p-3.5 rounded-xl border border-[#B8EAD8] space-y-1">
+            <span className="text-[#095C47] font-bold">Gate 1 • ATP Integrity ✓</span>
             <p className="font-bold text-[#14213D]">Available Spare &ge; Order Qty</p>
-            <p className="text-[11px] text-[#526582]">Never dips into a warehouse’s emergency safety reserve.</p>
+            <p className="text-[11px] text-[#3B4E6B]">Verified live against BigQuery Retail / FMCG ERP.</p>
           </div>
-          <div className="bg-[#F5F8FC] p-3.5 rounded-xl border border-[#DCE4EE] space-y-1">
-            <span className="text-[#0E5A8A] font-bold">Math Check 2 • Delivery SLA</span>
-            <p className="font-bold text-[#14213D]">Transit Hours &le; Stockout Window</p>
-            <p className="text-[11px] text-[#526582]">Confirms carrier delivery beats the store’s stockout timer.</p>
+          <div className="bg-[#EEFBF6] p-3.5 rounded-xl border border-[#B8EAD8] space-y-1">
+            <span className="text-[#095C47] font-bold">Gate 2 • Delivery SLA ✓</span>
+            <p className="font-bold text-[#14213D]">Transit ETA &le; Delivery Window</p>
+            <p className="text-[11px] text-[#3B4E6B]">Verified live against 3PL Logistics Rates MCP.</p>
           </div>
-          <div className="bg-[#F5F8FC] p-3.5 rounded-xl border border-[#DCE4EE] space-y-1">
-            <span className="text-[#0E5A8A] font-bold">Math Check 3 • Profit ROI</span>
-            <p className="font-bold text-[#14213D]">Protected Margin &gt; Shipping Cost</p>
-            <p className="text-[11px] text-[#526582]">Ensures gross profit saved ($6.20/pack) exceeds freight cost.</p>
+          <div className="bg-[#EEFBF6] p-3.5 rounded-xl border border-[#B8EAD8] space-y-1">
+            <span className="text-[#095C47] font-bold">Gate 3 • Profit ROI ✓</span>
+            <p className="font-bold text-[#14213D]">Protected Margin &gt; Shipping</p>
+            <p className="text-[11px] text-[#3B4E6B]">Confirms strictly net-positive retail profit ($6.20/pk).</p>
           </div>
           <div className="bg-[#FFFBEB] p-3.5 rounded-xl border border-[#FDE68A] space-y-1">
-            <span className="text-[#C27803] font-bold">Math Check 4 • Auto-Cap</span>
-            <p className="font-bold text-[#14213D]">Total Commitment &le; $1,000.00</p>
-            <p className="text-[11px] text-[#3B4E6B]">Orders over $1,000 pause here for manager approval.</p>
+            <span className="text-[#C27803] font-bold">Gate 4 • $1k / B2B Cap ⏳</span>
+            <p className="font-bold text-[#14213D]">Internal STO &le; $1,000 or VP Token</p>
+            <p className="text-[11px] text-[#3B4E6B]">Cross-company FMCG POs require signed VP token.</p>
           </div>
         </div>
       </div>
@@ -161,9 +135,9 @@ export const ApprovalsQueue: React.FC<ApprovalsQueueProps> = ({
       {cards.length === 0 ? (
         <div className="bg-white border border-[#DCE4EE] rounded-2xl p-10 text-center space-y-2 shadow-enterprise">
           <CheckCircle2 className="h-10 w-10 text-[#0D7A5F] mx-auto" />
-          <h3 className="font-serif text-base font-bold text-[#14213D]">All High-Value Orders Have Been Reviewed!</h3>
+          <h3 className="font-serif text-base font-bold text-[#14213D]">No Orders Waiting for VP Sign-Off</h3>
           <p className="text-xs text-[#526582]">
-            There are 0 orders waiting for manager sign-off. Run Scenario 2 on Tab 1 to simulate a Warehouse Shortage &amp; Factory Purchase Order escalation.
+            Cloud Firestore `a2a_approval_queue` currently has 0 pending tickets. Run <strong>2. Shop 2: Houston POS Stream</strong> on Tab 1 to trigger a real Retail DC Shortage &rarr; External B2B FMCG Purchase Order escalation via RemoteA2aAgent.
           </p>
         </div>
       ) : (
@@ -171,12 +145,12 @@ export const ApprovalsQueue: React.FC<ApprovalsQueueProps> = ({
           {cards.map((item) => {
             const sapOrder = approvedOrders[item.event_id] || item.sap_order_id || item.sap_transfer_order_id;
             const isApproved = Boolean(sapOrder) || item.status === 'approved';
-            const isFactory = (item.donor_dc || '').toUpperCase().includes('FMCG') || (item.donor_dc || '').toUpperCase().includes('WACO');
-            const freightVal = isFactory && item.freight_cost > 2000 ? 1850.0 : item.freight_cost;
-            const totalCommitment =
-              item.total_financial_commitment || (isFactory && item.freight_cost <= 2000 ? item.freight_cost + 15822.0 : item.freight_cost);
-            const storeDisplay = STORE_FRIENDLY_NAME[item.store_id] || item.store_id;
-            const sourceDisplay = SOURCE_FRIENDLY_NAME[item.donor_dc || ''] || item.donor_dc || 'Waco Bottling Factory';
+            const isFactory = (item.donor_dc || '').toUpperCase().includes('FMCG') || item.order_type === 'PO_TO_FMCG';
+            const freightVal = item.freight_cost || 1850.0;
+            const merchVal = item.fmcg_po_merchandise_cost || (isFactory ? Math.round(item.units * 8.79) : 0);
+            const totalCommitment = item.total_financial_commitment || Math.round((freightVal + merchVal) * 100) / 100;
+            const storeDisplay = item.store_display_name || getNodeDisplayName(item.store_id);
+            const sourceDisplay = item.donor_display_name || getNodeDisplayName(item.donor_dc || 'FMCG-PLANT-TX01');
 
             return (
               <div
@@ -188,7 +162,7 @@ export const ApprovalsQueue: React.FC<ApprovalsQueueProps> = ({
                 }`}
               >
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                  <div className="space-y-3">
+                  <div className="space-y-3 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span
                         className={`text-[11px] font-bold px-3 py-1 rounded-full border ${
@@ -198,12 +172,17 @@ export const ApprovalsQueue: React.FC<ApprovalsQueueProps> = ({
                         }`}
                       >
                         {isApproved
-                          ? '✅ APPROVED BY MANAGER • FACTORY ORDER DISPATCHED'
-                          : '⏳ WAITING FOR VP MANAGER SIGNATURE'}
+                          ? '✅ APPROVED BY VP • A2A SESSION RESUMED & PO DISPATCHED'
+                          : `⏳ A2A STATE: ${item.a2a_task_state || 'input-required'} • WAITING FOR VP`}
                       </span>
                       <span className="text-xs font-mono font-semibold text-[#094266] bg-[#ECF5FC] px-2.5 py-0.5 rounded-lg border border-[#C2DFF3]">
-                        Request #{item.ticket_id}
+                        Ticket #{item.ticket_id}
                       </span>
+                      {item.vertex_session_id && (
+                        <span className="text-[10px] font-mono text-[#526582] bg-[#F5F8FC] px-2 py-0.5 rounded border border-[#DCE4EE]">
+                          Session: {item.vertex_session_id.slice(0, 14)}...
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex items-center space-x-2">
@@ -216,24 +195,55 @@ export const ApprovalsQueue: React.FC<ApprovalsQueueProps> = ({
                     <p className="text-xs text-[#3B4E6B]">
                       Product: <strong className="text-[#14213D]">HydroBoost Electrolyte 12-Pack ({item.sku_id})</strong> • Quantity:{' '}
                       <strong className="text-[#0E5A8A]">{item.units.toLocaleString()} packs</strong> • Carrier:{' '}
-                      <strong className="text-[#14213D]">{item.carrier || 'HydroBoost Direct Cold-Chain Carrier'}</strong>
+                      <strong className="text-[#14213D]">{item.carrier}</strong>
                     </p>
 
-                    <div className="p-3.5 bg-[#FFFBEB] border border-[#FDE68A] rounded-xl text-xs text-[#925802] leading-relaxed">
-                      <strong>Why Manager Approval Is Needed (Math Check 4):</strong> {item.reason}
+                    {/* Pre-Verified Gates 1-3 + Gate 4 */}
+                    {Array.isArray(item.gate_rules_verified) && item.gate_rules_verified.length > 0 && (
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[10px]">
+                        {item.gate_rules_verified.map((r, rIdx) => {
+                          const passedNow = r.passed || (isApproved && rIdx === 3);
+                          return (
+                            <div
+                              key={r.rule_name}
+                              className={`px-2 py-1.5 rounded-lg border font-mono ${
+                                passedNow
+                                  ? 'bg-[#EEFBF6] border-[#B8EAD8] text-[#095C47]'
+                                  : 'bg-[#FFFBEB] border-[#FDE68A] text-[#925802]'
+                              }`}
+                            >
+                              <div className="font-bold">
+                                Gate {rIdx + 1}: {passedNow ? 'PASS ✓' : 'VP SIGN ⏳'}
+                              </div>
+                              <div className="truncate text-[9px]">{r.formula_expression}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    <div className="p-3 bg-[#FFFBEB] border border-[#FDE68A] rounded-xl text-xs text-[#925802] leading-relaxed">
+                      <strong>Gate 4 Governance Policy:</strong> {item.reason}
                     </div>
+
+                    {isApproved && item.a2a_resume_response && (
+                      <div className="p-3 bg-white border border-[#B8EAD8] rounded-xl text-[11px] text-[#095C47] leading-relaxed">
+                        <strong>Resumed RemoteA2aAgent Response ({item.vp_approval_token || 'VP Signed'}):</strong>{' '}
+                        {item.a2a_resume_response}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="flex flex-col lg:items-end justify-between space-y-4 shrink-0 bg-[#F5F8FC] p-4 rounded-xl border border-[#DCE4EE] min-w-[250px]">
+                  <div className="flex flex-col lg:items-end justify-between space-y-4 shrink-0 bg-[#F5F8FC] p-4 rounded-xl border border-[#DCE4EE] min-w-[260px]">
                     <div className="lg:text-right space-y-1">
                       <span className="text-[11px] font-semibold text-[#526582] block">
-                        Total Order Commitment (Product + Shipping)
+                        Total B2B Order Commitment
                       </span>
                       <p className="font-serif text-2xl font-bold text-[#14213D]">
                         ${totalCommitment.toLocaleString()}
                       </p>
                       <span className="text-[11px] text-[#C27803] font-semibold block">
-                        Includes ${freightVal.toLocaleString()} Express Cold-Chain Shipping
+                        {merchVal > 0 ? `$${merchVal.toLocaleString()} Wholesale + ` : ''}${freightVal.toLocaleString()} Shipping
                       </span>
                     </div>
 
@@ -246,14 +256,14 @@ export const ApprovalsQueue: React.FC<ApprovalsQueueProps> = ({
                         <UserCheck className="h-4 w-4" />
                         <span>
                           {loadingItem === item.event_id
-                            ? 'Approving & Sending Order...'
-                            : 'Approve & Dispatch Order'}
+                            ? 'Resuming A2A Agent & Issuing PO...'
+                            : 'Approve & Resume Remote A2A Agent'}
                         </span>
                       </button>
                     ) : (
                       <div className="w-full flex items-center justify-center space-x-1.5 text-xs text-[#095C47] font-bold bg-[#D5F5E9] border border-[#B8EAD8] px-4 py-2.5 rounded-xl">
                         <CheckCircle2 className="h-4 w-4 text-[#0D7A5F]" />
-                        <span>Order #{sapOrder} Sent!</span>
+                        <span>PO #{sapOrder} Dispatched!</span>
                       </div>
                     )}
                   </div>

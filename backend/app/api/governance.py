@@ -6,7 +6,6 @@ try:
     from shared.schemas import (
         ApprovalDecisionRequest,
         GateEvaluationResult,
-        ReplenishmentDecisionManifest,
         ReplenishmentProposal,
     )
     from backend.app.services.twin_engine import twin_service
@@ -15,7 +14,6 @@ except ImportError:
     from prototype.src.shared.schemas import (
         ApprovalDecisionRequest,
         GateEvaluationResult,
-        ReplenishmentDecisionManifest,
         ReplenishmentProposal,
     )
     from prototype.src.backend.app.services.twin_engine import twin_service
@@ -41,19 +39,22 @@ async def evaluate_gate(
 
 @router.get("/pending", response_model=List[Dict[str, Any]])
 async def list_pending_approvals():
-    """Retrieve all pending A2A Approval Cards from RemoteA2aAgent (http://localhost:8001/a2a/human_in_loop) and local twin queue."""
+    """Retrieve durable A2A Approval Cards directly from Cloud Firestore (`a2a_approval_queue`)."""
     return await twin_service.get_pending_a2a_cards()
 
 
 @router.post("/approve", response_model=Dict[str, Any])
 async def submit_human_approval(req: ApprovalDecisionRequest):
-    """Submit human sign-off from the React UI to RemoteA2aAgent (approval_agent) and finalize SAP STO."""
+    """Submit Retail VP sign-off from Tab 5 -> resume paused Vertex AI Agent Engine session ->
+    deliver human approval to Cloud Run RemoteA2aAgent (`approval_agent`) -> execute real FMCG PO via ERP MCP.
+    """
     try:
-        result = await twin_service.approve_transfer(req)
+        result = await twin_service.approve_transfer(req, broadcast_fn=manager.broadcast)
         await manager.broadcast({
             "type": "ORDER_APPROVED",
             "event_id": req.event_id,
             "manifest": result,
+            "state": result.get("state") or twin_service.get_topology_state(),
         })
         return result
     except ValueError as ve:

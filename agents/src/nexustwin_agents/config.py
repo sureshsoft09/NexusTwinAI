@@ -62,10 +62,10 @@ MCP_BIGQUERY_URL = os.getenv("MCP_BIGQUERY_URL", "https://bigquery-telemetry-mcp
 AUTONOMY_THRESHOLD_USD = float(os.getenv("AUTONOMY_THRESHOLD_USD", "1000.0"))
 MIN_STOCKOUT_RUNWAY_BUFFER_HOURS = float(os.getenv("MIN_STOCKOUT_RUNWAY_BUFFER_HOURS", "4.0"))
 
-# Remote A2A Agent Endpoints (Human-in-the-Loop Approval Agent on Port 8001)
+# Remote A2A Agent Endpoints (Cloud Run `to_a2a(approval_agent)` public HTTPS endpoint)
 A2A_APPROVAL_AGENT_BASE_URL = os.getenv(
     "A2A_APPROVAL_AGENT_BASE_URL",
-    "http://localhost:8001/a2a/human_in_loop",
+    "https://nexustwin-backend-311231946335.us-central1.run.app/a2a/human_in_loop",
 )
 
 # Deployed Vertex AI Agent Engine Resource ID

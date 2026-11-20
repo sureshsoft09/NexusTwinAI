@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, Warehouse, Truck, DollarSign, CheckCircle2, ShieldAlert, Play } from 'lucide-react';
 import { apiUrl } from '../apiConfig';
+import { getNodeDisplayName } from '../nodeCatalog';
 
 export const DynamicReplenishment: React.FC = () => {
   const [twinState, setTwinState] = useState<any>(null);
@@ -127,7 +128,7 @@ export const DynamicReplenishment: React.FC = () => {
               }`}
             >
               <div className="flex justify-between items-center mb-1">
-                <span className="font-bold text-[#14213D]">Austin Regional Warehouse</span>
+                <span className="font-bold text-[#14213D]">{getNodeDisplayName('DC-ATX-02')}</span>
                 {manifest.selected_donor_dc?.includes('DC-ATX-02') && (
                   <span className="text-[10px] bg-[#0D7A5F] text-white px-2 py-0.5 rounded-full font-bold">
                     SELECTED SOURCE
@@ -166,7 +167,7 @@ export const DynamicReplenishment: React.FC = () => {
               }`}
             >
               <div className="flex justify-between items-center mb-1">
-                <span className="font-bold text-[#14213D]">Houston Port Warehouse</span>
+                <span className="font-bold text-[#14213D]">{getNodeDisplayName('DC-HOU-01')}</span>
                 <span className="text-[10px] bg-[#FDF2F2] text-[#C93B2B] border border-[#F8CACA] px-2 py-0.5 rounded-full font-bold">
                   LOW SPARE: {hou.atp_surplus?.toLocaleString()} packs
                 </span>
@@ -174,7 +175,7 @@ export const DynamicReplenishment: React.FC = () => {
               <p className="text-[11px] text-[#3B4E6B] mt-1">
                 Total: {hou.on_hand?.toLocaleString()} packs • Safety Reserve: {hou.safety_buffer?.toLocaleString()} packs.
                 <strong className="text-[#925802] block mt-1">
-                  Cannot fulfill 1,800-pack order &rarr; Escalates to Waco Factory ({fmcg.atp_surplus?.toLocaleString()} spare).
+                  Cannot fulfill 1,800-pack order &rarr; Escalates to {getNodeDisplayName('FMCG-PLANT-TX01')} ({fmcg.atp_surplus?.toLocaleString()} spare).
                 </strong>
               </p>
             </div>
@@ -187,7 +188,7 @@ export const DynamicReplenishment: React.FC = () => {
               }`}
             >
               <div className="flex justify-between items-center mb-1">
-                <span className="font-bold text-[#14213D]">San Antonio Warehouse</span>
+                <span className="font-bold text-[#14213D]">{getNodeDisplayName('DC-SAT-03')}</span>
                 <span className="text-[10px] text-[#0D7A5F] font-bold">
                   Spare: {sat.atp_surplus?.toLocaleString()} packs
                 </span>
@@ -227,7 +228,7 @@ export const DynamicReplenishment: React.FC = () => {
               <div className="flex justify-between text-[11px]">
                 <span className="text-[#3B4E6B]">Route:</span>
                 <span className="text-[#14213D] font-semibold">
-                  {manifest.selected_donor_dc} &rarr; {manifest.target_store}
+                  {getNodeDisplayName(manifest.selected_donor_dc)} &rarr; {getNodeDisplayName(manifest.target_store)}
                 </span>
               </div>
               <p className="text-[11px] text-[#095C47] bg-white p-2 rounded-lg border border-[#B8EAD8]">

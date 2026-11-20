@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Filter, Download, RefreshCw, FileText, Clock, CheckCircle2 } from 'lucide-react';
 import { AuditRecord } from '../types';
 import { apiUrl } from '../apiConfig';
+import { getNodeDisplayName } from '../nodeCatalog';
 
 export const SystemsAuditLedger: React.FC = () => {
   const [records, setRecords] = useState<AuditRecord[]>([]);
@@ -10,64 +11,47 @@ export const SystemsAuditLedger: React.FC = () => {
   const [selectedRecord, setSelectedRecord] = useState<AuditRecord | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const mockAuditLedger: AuditRecord[] = [
-    {
-      event_id: 'evt_shop1_pos_dc_sto',
-      timestamp: '2026-11-06T12:35:10Z',
-      signal_source: 'STORE_CHECKOUT_SPIKE',
-      store_id: 'STORE-DAL-04 (Dallas Uptown)',
-      sku_id: 'HydroBoost Electrolyte 12-Pack',
-      observed_velocity: 215.0,
-      root_cause_explanation:
-        'Checkout sales jumped +348% over normal due to 98.2°F heatwave and local youth soccer tournament. Dispatched 1,500 packs from Austin Regional Warehouse.',
-      selected_donor_dc: 'DC-ATX-02 (Austin Warehouse)',
-      units_transferred: 1500,
-      freight_mode: 'Dedicated Ground Truck',
-      carrier_name: 'Texas Fleet Logistics',
-      estimated_freight_cost: 750.0,
-      gate_status: 'APPROVED',
-      requires_human_approval: false,
-      approver_name: 'Auto-Approved (Under $1,000 Shipping Limit)',
-      sap_transfer_order_id: 'STO-SAP-99214',
-    },
-    {
-      event_id: 'evt_shop3_weather_25d',
-      timestamp: '2026-11-06T11:15:42Z',
-      signal_source: '25_DAY_WEATHER_FORECAST',
-      store_id: 'STORE-PLANO-07 (Plano Legacy)',
-      sku_id: 'HydroBoost Electrolyte 12-Pack',
-      observed_velocity: 128.0,
-      root_cause_explanation:
-        '25-Day Weather Forecast identified a 104.2°F Heat Dome arriving in 25 days. Shipped 1,500 packs early via low-cost economy ground freight ($480).',
-      selected_donor_dc: 'DC-ATX-02 (Austin Warehouse)',
-      units_transferred: 1500,
-      freight_mode: 'Economy Pre-Stock Truck',
-      carrier_name: 'Texas Economy Ground',
-      estimated_freight_cost: 480.0,
-      gate_status: 'APPROVED',
-      requires_human_approval: false,
-      approver_name: 'Auto-Approved (Under $1,000 Shipping Limit)',
-      sap_transfer_order_id: 'STO-SAP-25D91',
-    },
-  ];
-
   const fetchLedger = async () => {
     setIsLoading(true);
     try {
       const res = await fetch(apiUrl('/api/v1/audit/ledger?limit=50'));
       if (res.ok) {
         const data = await res.json();
-        const rows = Array.isArray(data) ? data : data.records;
-        if (Array.isArray(rows) && rows.length > 0) {
-          setRecords(rows);
+        const rawRows = Array.isArray(data) ? data : data.records;
+        if (Array.isArray(rawRows)) {
+          const cleanRows = rawRows.filter(
+            (r: any) =>
+              r.event_id !== 'evt_tx_baseline_init' &&
+              r.signal_source !== 'LAKEHOUSE_BASELINE_INIT' &&
+              r.signal_source !== 'BIGQUERY_LAKEHOUSE_INIT' &&
+              r.order_type !== 'NONE'
+          );
+          // Deduplicate by event_id — prefer the finalized row with a real STO/PO order ID over an earlier Pending row
+          const byEvent = new Map<string, any>();
+          for (const row of cleanRows) {
+            const existing = byEvent.get(row.event_id);
+            const rowHasOrder = Boolean(row.sap_transfer_order_id && String(row.sap_transfer_order_id).trim());
+            const existingHasOrder = Boolean(
+              existing?.sap_transfer_order_id && String(existing.sap_transfer_order_id).trim()
+            );
+            if (
+              !existing ||
+              (rowHasOrder && !existingHasOrder) ||
+              (rowHasOrder === existingHasOrder && String(row.timestamp || '') >= String(existing.timestamp || ''))
+            ) {
+              byEvent.set(row.event_id, row);
+            }
+          }
+          const deduped = Array.from(byEvent.values()).sort((a, b) =>
+            String(b.timestamp || '').localeCompare(String(a.timestamp || ''))
+          );
+          setRecords(deduped);
         } else {
-          setRecords(mockAuditLedger);
+          setRecords([]);
         }
-      } else {
-        setRecords(mockAuditLedger);
       }
     } catch {
-      setRecords(mockAuditLedger);
+      // Keep current records if offline
     } finally {
       setIsLoading(false);
     }
@@ -204,73 +188,93 @@ export const SystemsAuditLedger: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#DCE4EE] text-[#3B4E6B]">
-              {filteredRecords.map((rec, i) => (
-                <tr key={`${rec.event_id}-${i}`} className="hover:bg-[#F5F8FC] transition">
-                  <td className="py-3.5 px-4">
-                    <div className="font-mono text-[#0E5A8A] font-bold">{rec.event_id}</div>
-                    <div className="text-[10px] text-[#526582] flex items-center space-x-1 mt-0.5">
-                      <Clock className="h-3 w-3" />
-                      <span>{new Date(rec.timestamp).toLocaleTimeString()}</span>
-                    </div>
-                  </td>
-
-                  <td className="py-3.5 px-4">
-                    <div className="font-bold text-[#14213D]">{rec.store_id}</div>
-                    <div className="text-[11px] text-[#526582]">HydroBoost 12-Pack</div>
-                  </td>
-
-                  <td className="py-3.5 px-4">
-                    <div className="font-bold text-[#C93B2B]">{rec.observed_velocity} packs/hr</div>
-                    <div className="text-[10px] text-[#526582]">{rec.signal_source}</div>
-                  </td>
-
-                  <td className="py-3.5 px-4">
-                    <div className="text-[#14213D] font-bold">
-                      {rec.units_transferred.toLocaleString()} packs
-                    </div>
-                    <div className="text-[11px] text-[#526582]">From {rec.selected_donor_dc}</div>
-                  </td>
-
-                  <td className="py-3.5 px-4">
-                    <div className="font-mono font-bold text-[#14213D]">
-                      ${rec.estimated_freight_cost.toFixed(2)}
-                    </div>
-                    <div className="text-[10px] text-[#526582] truncate max-w-[150px]">{rec.carrier_name}</div>
-                  </td>
-
-                  <td className="py-3.5 px-4">
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                        rec.requires_human_approval
-                          ? 'bg-[#FFFBEB] text-[#925802] border-[#FDE68A]'
-                          : 'bg-[#EEFBF6] text-[#095C47] border-[#B8EAD8]'
-                      }`}
-                    >
-                      {rec.requires_human_approval ? 'Manager Signed-Off' : 'Auto-Approved'}
-                    </span>
-                  </td>
-
-                  <td className="py-3.5 px-4">
-                    {rec.sap_transfer_order_id ? (
-                      <span className="font-mono font-bold text-[#0D7A5F] bg-[#EEFBF6] px-2.5 py-1 rounded-lg border border-[#B8EAD8] text-[11px]">
-                        {rec.sap_transfer_order_id}
-                      </span>
-                    ) : (
-                      <span className="text-[#C27803] font-semibold text-[11px]">Awaiting Sign-Off</span>
-                    )}
-                  </td>
-
-                  <td className="py-3.5 px-4 text-right">
-                    <button
-                      onClick={() => setSelectedRecord(rec)}
-                      className="inline-flex items-center space-x-1 text-xs font-bold text-[#0E5A8A] hover:text-[#094266] transition cursor-pointer"
-                    >
-                      <FileText className="h-3.5 w-3.5" />
-                      <span>View</span>
-                    </button>
+              {filteredRecords.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-10 px-4 text-center text-xs text-[#526582]">
+                    No restock orders recorded in BigQuery <code className="font-mono">audit_ledger</code> yet. Run any scenario on Tab 1 to see real autonomous STOs and VP-approved B2B FMCG POs appear here.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filteredRecords.map((rec, i) => {
+                  const hasOrderId = Boolean(rec.sap_transfer_order_id && rec.sap_transfer_order_id.trim());
+                  const isPendingVp = rec.requires_human_approval && !hasOrderId;
+                  return (
+                    <tr key={`${rec.event_id}-${i}`} className="hover:bg-[#F5F8FC] transition">
+                      <td className="py-3.5 px-4">
+                        <div className="font-mono text-[#0E5A8A] font-bold">{rec.event_id}</div>
+                        <div className="text-[10px] text-[#526582] flex items-center space-x-1 mt-0.5">
+                          <Clock className="h-3 w-3" />
+                          <span>{new Date(rec.timestamp).toLocaleTimeString()}</span>
+                        </div>
+                      </td>
+
+                      <td className="py-3.5 px-4">
+                        <div className="font-bold text-[#14213D]">{getNodeDisplayName(rec.store_id)}</div>
+                        <div className="text-[11px] text-[#526582]">HydroBoost 12-Pack</div>
+                      </td>
+
+                      <td className="py-3.5 px-4">
+                        <div className="font-bold text-[#C93B2B]">{rec.observed_velocity} packs/hr</div>
+                        <div className="text-[10px] text-[#526582]">{rec.signal_source}</div>
+                      </td>
+
+                      <td className="py-3.5 px-4">
+                        <div className="text-[#14213D] font-bold">
+                          {rec.units_transferred.toLocaleString()} packs
+                        </div>
+                        <div className="text-[11px] text-[#526582]">From {getNodeDisplayName(rec.selected_donor_dc)}</div>
+                      </td>
+
+                      <td className="py-3.5 px-4">
+                        <div className="font-mono font-bold text-[#14213D]">
+                          ${rec.estimated_freight_cost.toFixed(2)}
+                        </div>
+                        <div className="text-[10px] text-[#526582] truncate max-w-[150px]">{rec.carrier_name}</div>
+                      </td>
+
+                      <td className="py-3.5 px-4">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                            isPendingVp
+                              ? 'bg-[#FFFBEB] text-[#925802] border-[#FDE68A]'
+                              : rec.requires_human_approval
+                              ? 'bg-[#ECF5FC] text-[#094266] border-[#C2DFF3]'
+                              : 'bg-[#EEFBF6] text-[#095C47] border-[#B8EAD8]'
+                          }`}
+                        >
+                          {isPendingVp
+                            ? 'Pending VP Sign-Off'
+                            : rec.requires_human_approval
+                            ? 'VP Approved (> $1k)'
+                            : 'Auto-Approved (<= $1k)'}
+                        </span>
+                      </td>
+
+                      <td className="py-3.5 px-4">
+                        {hasOrderId ? (
+                          <span className="font-mono font-bold text-[#0D7A5F] bg-[#EEFBF6] px-2.5 py-1 rounded-lg border border-[#B8EAD8] text-[11px]">
+                            {rec.sap_transfer_order_id}
+                          </span>
+                        ) : isPendingVp ? (
+                          <span className="text-[#C27803] font-semibold text-[11px]">Awaiting VP Sign-Off</span>
+                        ) : (
+                          <span className="text-[#526582] font-mono text-[11px]">—</span>
+                        )}
+                      </td>
+
+                      <td className="py-3.5 px-4 text-right">
+                        <button
+                          onClick={() => setSelectedRecord(rec)}
+                          className="inline-flex items-center space-x-1 text-xs font-bold text-[#0E5A8A] hover:text-[#094266] transition cursor-pointer"
+                        >
+                          <FileText className="h-3.5 w-3.5" />
+                          <span>View</span>
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
@@ -309,7 +313,7 @@ export const SystemsAuditLedger: React.FC = () => {
                 <div className="bg-[#F5F8FC] p-3.5 rounded-xl border border-[#DCE4EE]">
                   <span className="text-[#526582] block text-[10px] font-semibold">Shipment Route</span>
                   <span className="text-[#14213D] font-bold">
-                    {selectedRecord.selected_donor_dc} &rarr; {selectedRecord.store_id}
+                    {getNodeDisplayName(selectedRecord.selected_donor_dc)} &rarr; {getNodeDisplayName(selectedRecord.store_id)}
                   </span>
                 </div>
                 <div className="bg-[#F5F8FC] p-3.5 rounded-xl border border-[#DCE4EE]">

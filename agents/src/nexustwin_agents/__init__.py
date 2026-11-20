@@ -20,20 +20,23 @@ from .agent import (
     root_agent,
     twin_supervisor,
     approval_agent,
-    execute_replenishment_sto,
-    execute_fmcg_purchase_order,
+    evaluate_4_gate_guardrail,
     NexusTwinSupervisor,
 )
-from nexustwin_agents.gate import FeasibilityGateEvaluator, evaluate_feasibility_gate
+from nexustwin_agents.gate import (
+    FeasibilityGateEvaluator,
+    evaluate_feasibility_gate,
+    evaluate_feasibility_gate_from_common_output,
+)
 
 __all__ = [
     "agent",
     "root_agent",
     "twin_supervisor",
     "approval_agent",
-    "execute_replenishment_sto",
-    "execute_fmcg_purchase_order",
+    "evaluate_4_gate_guardrail",
     "NexusTwinSupervisor",
     "FeasibilityGateEvaluator",
     "evaluate_feasibility_gate",
+    "evaluate_feasibility_gate_from_common_output",
 ]

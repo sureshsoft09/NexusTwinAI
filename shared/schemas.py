@@ -1,7 +1,8 @@
 """Enterprise Pydantic schemas for NexusTwin AI.
 
 Standardized data transfer contracts across ADK Multi-Agent swarms,
-FastMCP Streamable HTTP microservices, FastAPI Agent Bridge, and BigQuery Lakehouse.
+FastMCP Streamable HTTP microservices, RemoteA2aAgent (HITL), FastAPI Agent Bridge,
+Cloud Firestore (real-time operational state), and BigQuery Lakehouse (ERP & audit).
 """
 
 from datetime import datetime, timezone
@@ -18,12 +19,12 @@ class GateStatus(str, Enum):
 
 class MarketSignalEvent(BaseModel):
     """Inbound telemetry signal from POS Scanner, Weather API Forecast, or Social Media Monitor."""
-    event_id: str = Field(..., description="Unique event identifier, e.g. evt_tx_9921")
+    event_id: str = Field(..., description="Unique event identifier, e.g. evt_shop1_pos_dc_sto")
     store_id: str = Field(..., description="Retail store identifier, e.g. STORE-DAL-04")
     sku_id: str = Field(..., description="Universal product SKU, e.g. SKU-4089-HYDRATE")
     observed_velocity: float = Field(..., description="Real-time or projected sales velocity (units/hour)")
     baseline_velocity: float = Field(..., description="Baseline 30-day velocity (units/hour)")
-    current_store_stock: int = Field(..., description="Units on shelf and store backroom")
+    current_store_stock: int = Field(..., description="Live units on shelf from Firestore/DB")
     signal_source: str = Field(
         default="POS_SCANNER",
         description="Trigger source: POS_SCANNER | WEATHER_FORECAST_25D | SOCIAL_MEDIA_MONITOR",
@@ -57,7 +58,7 @@ class MarketSignalContext(BaseModel):
 class LogisticsOption(BaseModel):
     """Logistics route and freight quote from logistics_rates_mcp."""
     carrier_name: str
-    freight_mode: str  # e.g., "LATERAL_GROUND_TRANSFER", "FMCG_DIRECT_PO_FREIGHT", "EXPEDITED_AIR_FREIGHT"
+    freight_mode: str
     origin_dc: str
     destination_store: str
     transit_hours: float
@@ -88,10 +89,11 @@ class ReplenishmentProposal(BaseModel):
 
 
 class SensingAgentCommonOutput(BaseModel):
-    """Standardized output contract from Market Sensing Agent (`sensing_agent`)."""
-    agent_name: str = "sensing_agent"
+    """Standardized output contract from Market Sensing Agent (`market_sensing_agent`)."""
+    agent_name: str = "market_sensing_agent"
     signal_source: str
     store_id: str
+    store_display_name: str = ""
     sku_id: str
     observed_velocity_hr: float
     baseline_velocity_hr: float
@@ -109,6 +111,7 @@ class ReplenishmentAgentCommonOutput(BaseModel):
     """Standardized output contract from Stock & Replenishment Agent (`replenishment_agent`)."""
     agent_name: str = "replenishment_agent"
     serving_dc_id: str
+    serving_dc_display_name: str = ""
     serving_dc_on_hand: int
     serving_dc_safety_buffer: int
     serving_dc_atp_surplus: int
@@ -116,6 +119,7 @@ class ReplenishmentAgentCommonOutput(BaseModel):
     serving_dc_has_stock: bool
     escalated_to_fmcg: bool = False
     selected_source_node: str
+    selected_source_display_name: str = ""
     selected_source_atp_surplus: int
     order_type: str  # "STO_FROM_DC" or "PO_TO_FMCG"
     unit_gross_margin_usd: float = 6.20
@@ -145,11 +149,12 @@ class LogisticsAgentCommonOutput(BaseModel):
 
 
 class MultiAgentCommonOutput(BaseModel):
-    """Standardized Common Multi-Agent Output JSON produced by the NexusTwin AI Multi-Agent System
-    before passing into the 4 Mandatory Mathematical Gate Checks.
+    """Standardized Common Multi-Agent Output JSON produced by the Vertex AI Agent Engine
+    Multi-Agent Swarm from real live MCP tool responses and evaluated by the 4-Gate Guardrail.
     """
     event_id: str
     scenario_key: Optional[str] = None
+    data_source: str = "VERTEX_AI_AGENT_ENGINE_LIVE"
     sensing_agent_output: SensingAgentCommonOutput
     replenishment_agent_output: ReplenishmentAgentCommonOutput
     logistics_agent_output: LogisticsAgentCommonOutput
@@ -178,21 +183,23 @@ class GateEvaluationResult(BaseModel):
 
 
 class ApprovalDecisionRequest(BaseModel):
-    """Human approval submission for transfers/POs exceeding $1,000 autonomy threshold."""
+    """Human approval submission for transfers/POs exceeding $1,000 autonomy threshold or external FMCG POs."""
     event_id: str
     approved: bool
     approver_name: str = "VP of Supply Chain Operations"
     approver_email: str = "director.ops@enterprise-fmcg.com"
-    comments: Optional[str] = "Approved via React Control Tower"
+    comments: Optional[str] = "Approved via Executive Control Tower"
     signed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class ReplenishmentDecisionManifest(BaseModel):
-    """Comprehensive decision payload dispatched to ERP, BigQuery Lakehouse, and UI."""
+    """Comprehensive decision payload dispatched to ERP, BigQuery Lakehouse, Firestore, and UI."""
     event_id: str
     sku_id: str
     target_store: str
+    target_store_display_name: str = ""
     selected_donor_dc: str
+    selected_donor_display_name: str = ""
     order_type: str = "STO_FROM_DC"  # "STO_FROM_DC" or "PO_TO_FMCG"
     signal_source: str = "POS_SCANNER"
     forecast_horizon_days: int = 0
@@ -207,11 +214,17 @@ class ReplenishmentDecisionManifest(BaseModel):
     requires_human_approval: bool
     sap_transfer_order_id: Optional[str] = None
     fmcg_purchase_order_id: Optional[str] = None
+    a2a_ticket_id: Optional[str] = None
+    a2a_task_state: Optional[str] = None  # "input-required" | "completed"
+    a2a_agent_response: Optional[str] = None
+    data_source: str = "VERTEX_AI_AGENT_ENGINE_LIVE"
     agent_engine_resource_id: Optional[str] = None
     vertex_session_id: Optional[str] = None
+    vertex_user_id: Optional[str] = None
     remote_executed: bool = False
     agent_response_text: Optional[str] = None
     step_events: List[Dict[str, Any]] = Field(default_factory=list)
+    live_stream_packets: List[Dict[str, Any]] = Field(default_factory=list)
     common_agent_output: Optional[MultiAgentCommonOutput] = None
     gate_evaluation: Optional[GateEvaluationResult] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

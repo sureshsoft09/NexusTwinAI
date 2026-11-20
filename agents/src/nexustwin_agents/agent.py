@@ -1,6 +1,6 @@
 """Google ADK Entrypoint (`agent.py`) for `nexustwin_agents`.
 
-Required by `adk web` and `adk api_server` for agent package discovery in the UI dropdown.
+Required by `adk web`, `adk api_server`, and Vertex AI Agent Engine deployment.
 Exports `root_agent = twin_supervisor`.
 """
 
@@ -10,8 +10,7 @@ from nexustwin_agents.supervisor import (
     replenishment_tool,
     logistics_tool,
     approval_agent,
-    execute_replenishment_sto,
-    execute_fmcg_purchase_order,
+    evaluate_4_gate_guardrail,
     NexusTwinSupervisor,
 )
 
@@ -24,7 +23,6 @@ __all__ = [
     "replenishment_tool",
     "logistics_tool",
     "approval_agent",
-    "execute_replenishment_sto",
-    "execute_fmcg_purchase_order",
+    "evaluate_4_gate_guardrail",
     "NexusTwinSupervisor",
 ]

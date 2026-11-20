@@ -7,7 +7,7 @@ import { DigitalTwinMap } from './pages/DigitalTwinMap';
 import { MarketRadar } from './pages/MarketRadar';
 import { DynamicReplenishment } from './pages/DynamicReplenishment';
 import { WhatIfSimulator } from './pages/WhatIfSimulator';
-import { ApprovalsQueue, A2AApprovalCard, DEFAULT_FALLBACK_CARDS } from './pages/ApprovalsQueue';
+import { ApprovalsQueue, A2AApprovalCard } from './pages/ApprovalsQueue';
 import { SystemsAuditLedger } from './pages/SystemsAuditLedger';
 
 function deduplicateApprovalCards(list: A2AApprovalCard[]): A2AApprovalCard[] {
@@ -46,8 +46,7 @@ export const App: React.FC = () => {
         }
       }
     } catch {
-      // Fallback only if backend is unreachable
-      setCards((prev) => (prev.length > 0 ? prev : DEFAULT_FALLBACK_CARDS));
+      // Keep existing cards when offline
     }
   }, []);
 
@@ -120,16 +119,8 @@ export const App: React.FC = () => {
     (c) => !approvedOrders[c.event_id] && c.status !== 'approved' && !c.sap_order_id && !c.sap_transfer_order_id
   ).length;
 
-  const renderActivePage = () => {
+  const renderSecondaryPage = () => {
     switch (activeTab) {
-      case 'digital_twin_map':
-        return (
-          <DigitalTwinMap
-            key={`map-${resetVersion}`}
-            onOpenApprovals={() => setActiveTab('approvals_queue')}
-            onScenarioCompleted={fetchPendingCards}
-          />
-        );
       case 'market_sensing_radar':
         return <MarketRadar key={`radar-${resetVersion}`} />;
       case 'dynamic_replenishment':
@@ -150,13 +141,7 @@ export const App: React.FC = () => {
       case 'systems_audit_ledger':
         return <SystemsAuditLedger key={`aud-${resetVersion}`} />;
       default:
-        return (
-          <DigitalTwinMap
-            key={`map-${resetVersion}`}
-            onOpenApprovals={() => setActiveTab('approvals_queue')}
-            onScenarioCompleted={fetchPendingCards}
-          />
-        );
+        return null;
     }
   };
 
@@ -179,7 +164,17 @@ export const App: React.FC = () => {
         />
 
         <main className="flex-1 overflow-y-auto bg-[#F5F8FC]">
-          {renderActivePage()}
+          {/* Keep Tab 1 mounted across tab switches so executed flow stays visible until Reset Demo Stock */}
+          <div className={activeTab === 'digital_twin_map' ? 'h-full' : 'hidden'}>
+            <DigitalTwinMap
+              key={`map-${resetVersion}`}
+              isActive={activeTab === 'digital_twin_map'}
+              approvedOrders={approvedOrders}
+              onOpenApprovals={() => setActiveTab('approvals_queue')}
+              onScenarioCompleted={fetchPendingCards}
+            />
+          </div>
+          {activeTab !== 'digital_twin_map' && renderSecondaryPage()}
         </main>
 
         {/* Persistent Global Retail Footer */}
