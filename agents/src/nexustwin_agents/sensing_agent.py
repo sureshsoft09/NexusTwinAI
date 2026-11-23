@@ -16,9 +16,13 @@ except ImportError:
 
 try:
     from google.adk.agents import LlmAgent
+    from google.genai import types
+    _SENSING_GEN_CFG = types.GenerateContentConfig(temperature=0.1, max_output_tokens=512)
 except ImportError:
+    _SENSING_GEN_CFG = None
+
     class LlmAgent:
-        def __init__(self, name: str, instruction: str, model: str = "gemini-3.5-flash", tools: list = None, **kwargs):
+        def __init__(self, name: str, instruction: str, model: str = "gemini-3.5-flash-lite", tools: list = None, **kwargs):
             self.name = name
             self.instruction = instruction
             self.model = model
@@ -26,23 +30,19 @@ except ImportError:
 
 
 SENSING_INSTRUCTION = """
-You are the NexusTwin Market Sensing Specialist (`market_sensing_agent`).
-You MUST use the live `bigquery-telemetry-mcp` MCP tools — never invent or guess numbers!
+You are `market_sensing_agent`. Use ONLY live `bigquery-telemetry-mcp` tools; never invent numbers.
 
-Workflow:
-1. ALWAYS call `get_scanner_velocity_history(store_id, sku_id)` to retrieve the REAL live shelf stock
-   (`current_shelf_stock`), `safety_buffer`, `current_velocity`, `baseline_velocity`, `spike_ratio`,
-   `shelf_runway_hours`, and `replenishment_sla_window_hours` from the database.
-2. Also call the relevant context MCP tool(s):
-   - For `WEATHER_FORECAST_25D` or `STORE-PLANO-07`: call `get_long_range_weather_forecast(store_id, days_ahead=25)`.
-   - For `SOCIAL_MEDIA_MONITOR` or `STORE-ARL-11`: call `monitor_social_media_and_forums(store_id, sku_id)`.
-   - For `POS_SCANNER` spikes: call `query_weather_and_local_events(store_id)` and `detect_velocity_spike_anomaly(...)`.
-3. Report back clearly with ALL exact numeric values returned by the MCP tools:
-   - `store_id`, `store_display_name`, `sku_id`, `signal_source`
-   - `observed_velocity_hr`, `baseline_velocity_hr`, `velocity_spike_ratio`
-   - `current_shelf_stock`, `safety_buffer`, `stockout_runway_hours`, `replenishment_sla_window_hours`
-   - `mcp_tools_called` (exact tool names invoked)
-   - Concise causal root-cause finding grounded strictly in the MCP data.
+STRICT MINIMAL-CALL RULES (1 tool turn only — NEVER repeat calls):
+1. Call `get_scanner_velocity_history(store_id, sku_id)` ONCE (it already returns live `current_shelf_stock`,
+   `safety_buffer`, `current_velocity`, `baseline_velocity`, `spike_ratio`, `shelf_runway_hours`, and `replenishment_sla_window_hours`).
+2. Call at most ONE context tool ONLY when applicable (in the SAME tool turn if possible):
+   - `WEATHER_FORECAST_25D` or `STORE-PLANO-07` -> `get_long_range_weather_forecast(store_id, days_ahead=25)`
+   - `SOCIAL_MEDIA_MONITOR` or `STORE-ARL-11` -> `monitor_social_media_and_forums(store_id, sku_id)`
+   - `POS_SCANNER` -> DO NOT call `detect_velocity_spike_anomaly` or `query_weather_and_local_events`; `get_scanner_velocity_history` has all required metrics.
+3. Return ONLY a concise JSON object (no essay) containing exact MCP values:
+   `store_id`, `store_display_name`, `sku_id`, `signal_source`, `observed_velocity_hr`,
+   `baseline_velocity_hr`, `velocity_spike_ratio`, `current_shelf_stock`, `safety_buffer`,
+   `stockout_runway_hours`, `replenishment_sla_window_hours`, `mcp_tools_called`, and a 1-sentence `finding_summary`.
 """
 
 sensing_agent = LlmAgent(
@@ -51,6 +51,8 @@ sensing_agent = LlmAgent(
     description="Queries live bigquery-telemetry-mcp for real store POS velocity, shelf stock, 25-day weather forecasts, and social event spikes.",
     instruction=SENSING_INSTRUCTION,
     tools=[BigQueryMCP_Tool],
+    before_model_callback=config.before_model_guard,
+    generate_content_config=_SENSING_GEN_CFG,
 )
 
 # Backwards-compatible aliases

@@ -13,9 +13,13 @@ except ImportError:
 
 try:
     from google.adk.agents import LlmAgent
+    from google.genai import types
+    _LOG_GEN_CFG = types.GenerateContentConfig(temperature=0.1, max_output_tokens=512)
 except ImportError:
+    _LOG_GEN_CFG = None
+
     class LlmAgent:
-        def __init__(self, name: str, instruction: str, model: str = "gemini-3.5-flash", tools: list = None, **kwargs):
+        def __init__(self, name: str, instruction: str, model: str = "gemini-3.5-flash-lite", tools: list = None, **kwargs):
             self.name = name
             self.instruction = instruction
             self.model = model
@@ -23,28 +27,26 @@ except ImportError:
 
 
 LOGISTICS_INSTRUCTION = """
-You are the NexusTwin Logistics & 3PL Carrier Optimization Specialist (`logistics_agent`).
-You MUST call the live `logistics-rates-mcp` MCP tools — never invent freight prices or transit hours!
+You are `logistics_agent`. Use ONLY live `logistics-rates-mcp` tools; never invent prices or transit hours.
 
-Workflow:
-1. Call `calculate_freight_rates(origin_dc, dest_store, weight_kg, urgency)` using the exact `origin_dc`
-   (e.g., `DC-ATX-02`, `DC-SAT-03`, or `FMCG-PLANT-TX01`), `dest_store`, and appropriate urgency
-   (`ADVANCE_25D` for 25-day weather forecasts, `FMCG_DIRECT` for FMCG plant shipments, `EVENT_SURGE` for social spikes, or `STANDARD`).
-2. Compare the returned 3PL carrier quotes and pick the lowest-cost carrier that meets the delivery SLA window.
-3. Report ALL exact values returned by `logistics-rates-mcp`:
-   - `origin_node`, `destination_store`
-   - `carrier_name`, `freight_mode`
-   - `transit_hours`, `sla_window_hours`
-   - `freight_cost_usd`
-   - `carrier_negotiation_summary` (comparing selected carrier vs rejected expensive options) and `mcp_tools_called`.
+STRICT SINGLE-CALL RULE:
+1. Call `calculate_freight_rates(origin_dc, dest_store, weight_kg, urgency)` EXACTLY ONCE
+   (`weight_kg = requested_units * 6.0` if omitted; `urgency`: `ADVANCE_25D` for 25-day weather / `STORE-PLANO-07`,
+   `FMCG_DIRECT` for `FMCG-PLANT-TX01`, `EVENT_SURGE` for social spikes / `STORE-ARL-11`, else `STANDARD`).
+2. DO NOT call `get_carrier_transit_eta` or any second tool — `calculate_freight_rates` already includes transit hours and SLA windows.
+3. Select the lowest-cost carrier meeting the SLA window and return ONLY a concise JSON object (no essay):
+   `origin_node`, `destination_store`, `carrier_name`, `freight_mode`, `transit_hours`,
+   `sla_window_hours`, `freight_cost_usd`, `mcp_tools_called`, and 1-sentence `carrier_negotiation_summary`.
 """
 
 logistics_agent = LlmAgent(
-    model=config.get_gemini_model(config.MODEL_REASONING),
+    model=config.get_gemini_model(config.MODEL_FAST),
     name="logistics_agent",
     description="Queries live logistics-rates-mcp for 3PL carrier freight quotes, realistic Texas transit ETAs, and SLA compliance.",
     instruction=LOGISTICS_INSTRUCTION,
     tools=[LogisticsMCP_Tool],
+    before_model_callback=config.before_model_guard,
+    generate_content_config=_LOG_GEN_CFG,
 )
 
 logistics_investigate = logistics_agent

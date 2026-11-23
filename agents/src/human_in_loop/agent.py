@@ -20,6 +20,7 @@ Protocol Lifecycle:
      BigQuery & Firestore!
 """
 
+import asyncio
 import os
 import sys
 from datetime import datetime, timezone
@@ -181,13 +182,35 @@ def ask_for_approval(
     }
 
 
+_APPROVAL_PROJECT = os.getenv("GCP_PROJECT_ID", os.getenv("GOOGLE_CLOUD_PROJECT", "nexustwinai-project"))
+_APPROVAL_LOCATION = os.getenv("GEMINI_MODEL_LOCATION", "global")
+_APPROVAL_MODEL = os.getenv("MODEL_APPROVAL", os.getenv("MODEL_FAST", "gemini-3.5-flash-lite"))
+_APPROVAL_PACING_SEC = float(os.getenv("LLM_PACING_DELAY_SEC", "0.5"))
+
+
+async def _approval_before_model_guard(callback_context: Any, llm_request: Any) -> Optional[Any]:
+    os.environ["GOOGLE_CLOUD_PROJECT"] = _APPROVAL_PROJECT
+    os.environ["GOOGLE_CLOUD_LOCATION"] = _APPROVAL_LOCATION
+    os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "true"
+    if _APPROVAL_PACING_SEC > 0:
+        await asyncio.sleep(_APPROVAL_PACING_SEC)
+    return None
+
+
 root_agent = Agent(
     model=Gemini(
-        model=os.getenv("ADK_MODEL", "gemini-3.5-flash"),
+        model=_APPROVAL_MODEL,
+        client_kwargs={
+            "vertexai": True,
+            "project": _APPROVAL_PROJECT,
+            "location": _APPROVAL_LOCATION,
+        },
         retry_options=types.HttpRetryOptions(
-            initial_delay=2.0,
-            attempts=5,
+            initial_delay=3.0,
+            max_delay=45.0,
+            attempts=8,
             exp_base=2.0,
+            jitter=1.0,
             http_status_codes=[429, 500, 502, 503, 504],
         ),
     ),
@@ -199,32 +222,25 @@ root_agent = Agent(
         "the Retail VP provides a signed `vp_approval_token`."
     ),
     instruction="""
-You are the Remote A2A Supply Chain Governance & VP Approval Agent (`approval_agent`) for NexusTwin AI.
+You are `approval_agent`, the Remote A2A Supply Chain Governance & VP Approval Agent.
 
-Workflow — TWO PHASES:
-
-PHASE 1 — WHEN A NEW GATE-4 ESCALATION ARRIVES (NO VP APPROVAL TOKEN YET):
-1. Call `ask_for_approval(...)` with exact values (`purpose`, `amount`, `sku_id`, `donor_dc`,
+PHASE 1 — NEW GATE-4 ESCALATION (no `SIG-` token yet):
+1. Call `ask_for_approval(...)` ONCE with exact parameters (`purpose`, `amount`, `sku_id`, `donor_dc`,
    `target_store`, `units`, `freight_cost`, `merchandise_cost`, `event_id`).
-2. DO NOT call `create_fmcg_purchase_order` or `create_transfer_order` yet!
-3. Immediately return a clear summary including the exact `ticket_id` (e.g. `HITL-PO-...`),
-   `a2a_task_state: "input-required"`, and confirm that Gates 1-3 passed while Gate 4 is waiting
-   for Retail VP sign-off in Tab 5.
+2. NEVER call `create_fmcg_purchase_order` or `create_transfer_order` yet.
+3. Return a concise summary with exact `ticket_id`, `a2a_task_state: "input-required"`, and note that Gate 4 awaits Retail VP sign-off in Tab 5.
 
-PHASE 2 — WHEN HUMAN VP APPROVAL INPUT + `vp_approval_token` (prefix `SIG-`) ARRIVES:
-1. Verify the approval message contains `APPROVED` and a signed `vp_approval_token` (e.g. `SIG-VP-...`).
-2. Resume the workflow by calling the live `erp-inventory-mcp` tool directly:
-   - For External FMCG PO (`PO_TO_FMCG` / `FMCG-PLANT-TX01`): call
-     `create_fmcg_purchase_order(target_store, serving_dc, sku, quantity, freight_cost_usd, vp_approval_token, fmcg_vendor_id="FMCG-PLANT-TX01", event_id=...)`.
-   - For Internal DC STO (`STO_FROM_DC`): call
-     `create_transfer_order(from_dc, to_location, sku, quantity, freight_cost_usd, vp_approval_token, event_id=...)`.
-3. Report the confirmed live `PO-FMCG-...` or `STO-SAP-...` order ID, updated BigQuery inventory balance,
-   and `a2a_task_state: "completed"`.
-4. If the VP rejects the request, do NOT call any ERP write tool and report that the order was declined.
+PHASE 2 — RETAIL VP RESUME INPUT WITH `APPROVED` + `vp_approval_token` (`SIG-...`):
+1. Call the live `erp-inventory-mcp` write tool ONCE:
+   - External FMCG PO (`PO_TO_FMCG` / `FMCG-PLANT-TX01`): `create_fmcg_purchase_order(target_store, serving_dc, sku, quantity, freight_cost_usd, vp_approval_token, fmcg_vendor_id="FMCG-PLANT-TX01", event_id=...)`
+   - Internal DC STO (`STO_FROM_DC`): `create_transfer_order(from_dc, to_location, sku, quantity, freight_cost_usd, vp_approval_token, event_id=...)`
+2. Report the confirmed `PO-FMCG-...` or `STO-SAP-...` order ID and `a2a_task_state: "completed"`.
+3. If declined/rejected, do NOT call any ERP write tool and report the decline.
 """,
     tools=[
         LongRunningFunctionTool(func=ask_for_approval),
         ApprovalErpMCP_Tool,
     ],
-    generate_content_config=types.GenerateContentConfig(temperature=0.1),
+    before_model_callback=_approval_before_model_guard,
+    generate_content_config=types.GenerateContentConfig(temperature=0.1, max_output_tokens=512),
 )

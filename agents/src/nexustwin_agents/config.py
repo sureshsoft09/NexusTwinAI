@@ -1,17 +1,18 @@
 """Configuration and environment management for NexusTwin AI ADK agents."""
 
+import asyncio
 import os
 import sys
 from pathlib import Path
+from typing import Any, Optional
 from dotenv import load_dotenv
 
-# Search for .env in `agents/.env` or `backend/.env`
+# Search for .env (nearest file wins; do not clobber explicit runtime env vars from Cloud Run / Agent Engine)
 _curr = Path(__file__).resolve().parent
 for _ in range(4):
     for _cand in (_curr / ".env", _curr / "backend" / ".env", _curr / "agents" / ".env"):
         if _cand.exists():
-            load_dotenv(_cand, override=True)
-            break
+            load_dotenv(_cand, override=False)
     _curr = _curr.parent
 
 # Google Cloud & Vertex AI settings (Standardized on NexusTwinAI-project: nexustwinai-project)
@@ -28,14 +29,29 @@ os.environ["GCP_PROJECT_ID"] = GCP_PROJECT_ID
 os.environ["GOOGLE_CLOUD_LOCATION"] = GEMINI_MODEL_LOCATION
 os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = GOOGLE_GENAI_USE_VERTEXAI
 
-# ADK Model configuration (Standardized on gemini-3.5-flash with automatic 429 retry backoff)
+# ADK Multi-Pool Model Configuration (splits RPM/TPM across live `global` models to prevent 429)
 ADK_MODEL = os.getenv("ADK_MODEL", "gemini-3.5-flash")
 MODEL_REASONING = os.getenv("MODEL_REASONING", "gemini-3.5-flash")
-MODEL_FAST = os.getenv("MODEL_FAST", "gemini-3.5-flash")
+MODEL_FAST = os.getenv("MODEL_FAST", "gemini-3.5-flash-lite")
+MODEL_APPROVAL = os.getenv("MODEL_APPROVAL", "gemini-3.5-flash-lite")
+LLM_PACING_DELAY_SEC = float(os.getenv("LLM_PACING_DELAY_SEC", "0.5"))
+
+
+async def before_model_guard(callback_context: Any, llm_request: Any) -> Optional[Any]:
+    """Runtime guard run before every LLM call inside Vertex AI Agent Engine & local ADK:
+    1. Reinforces `GOOGLE_CLOUD_LOCATION=global` inside us-central1 Reasoning Engine containers.
+    2. Applies a lightweight pacing delay to avoid same-second RPM burst spikes.
+    """
+    os.environ["GOOGLE_CLOUD_PROJECT"] = GCP_PROJECT_ID
+    os.environ["GOOGLE_CLOUD_LOCATION"] = GEMINI_MODEL_LOCATION
+    os.environ["GOOGLE_GENAI_USE_VERTEXAI"] = "true"
+    if LLM_PACING_DELAY_SEC > 0:
+        await asyncio.sleep(LLM_PACING_DELAY_SEC)
+    return None
 
 
 def get_gemini_model(model_name: str | None = None):
-    """Return a Google ADK `Gemini` model configured with automatic HTTP 429 exponential backoff retry."""
+    """Return a Google ADK `Gemini` model pinned to `global` with robust HTTP 429 exponential backoff."""
     target_model = model_name or ADK_MODEL
     try:
         from google.adk.models import Gemini
@@ -43,10 +59,17 @@ def get_gemini_model(model_name: str | None = None):
 
         return Gemini(
             model=target_model,
+            client_kwargs={
+                "vertexai": True,
+                "project": GCP_PROJECT_ID,
+                "location": GEMINI_MODEL_LOCATION,
+            },
             retry_options=types.HttpRetryOptions(
-                initial_delay=2.0,
-                attempts=5,
+                initial_delay=3.0,
+                max_delay=45.0,
+                attempts=8,
                 exp_base=2.0,
+                jitter=1.0,
                 http_status_codes=[429, 500, 502, 503, 504],
             ),
         )

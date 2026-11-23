@@ -91,11 +91,11 @@ const HEALTHY_FALLBACK_INVENTORY: Record<
 };
 
 const PIPELINE_STAGES = [
-  { id: 'sensing', label: '1. Sensing MCP' },
-  { id: 'replenishment', label: '2. ERP / FMCG MCP' },
-  { id: 'logistics', label: '3. 3PL Rates MCP' },
-  { id: 'gate_guardrail', label: '4. 4-Gate Guardrail' },
-  { id: 'execution_a2a', label: '5. ERP STO / A2A' },
+  { id: 'sensing', label: '1. Demand Sensing' },
+  { id: 'replenishment', label: '2. Stock & Supply' },
+  { id: 'logistics', label: '3. Carrier & Freight' },
+  { id: 'gate_guardrail', label: '4. 4 Safety Checks' },
+  { id: 'execution_a2a', label: '5. Dispatch / Approval' },
 ];
 
 function flattenInventoryFromState(stateInventory: any) {
@@ -265,7 +265,7 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({
             setLiveAlertBanner(msg.alert_message || '');
           } else if (msg.type === 'MULTI_AGENT_PROCESSING') {
             setPhase('AGENT_PROCESSING');
-            setAgentStatusMsg(msg.status_message || 'Vertex AI Agent Engine Swarm Active...');
+            setAgentStatusMsg(msg.status_message || 'Triggering Multi-Agent System...');
           } else if (msg.type === 'AGENT_STEP_EVENT' && msg.step) {
             setPhase('AGENT_PROCESSING');
             const st: AgentStepEvent = msg.step;
@@ -278,7 +278,7 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({
                 return st.stage || prevStage;
               });
             }
-            setAgentStatusMsg(st.message || st.stage_label || 'Executing live MCP tool...');
+            setAgentStatusMsg(st.stage_label || 'Multi-Agent System evaluating live inventory & routes...');
           } else if (msg.type === 'COMMON_AGENT_OUTPUT_READY') {
             setPhase('COMMON_OUTPUT_READY');
             if (msg.common_agent_output) {
@@ -352,7 +352,7 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({
     setShowStreamConsole(true);
     setPhase('STREAMING_TELEMETRY');
     setLiveAlertBanner('');
-    setAgentStatusMsg('Streaming live telemetry ticks into Cloud Firestore...');
+    setAgentStatusMsg(`Streaming live store demand for HydroBoost Electrolyte 12-Pack at ${getNodeShortName(focusStore)}...`);
 
     try {
       const res = await fetch(apiUrl(`/api/v1/signals/scenario/${scenarioKey}?speed=${streamSpeed}`), {
@@ -443,16 +443,21 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({
 
   return (
     <div className="h-full flex flex-col p-4 space-y-3 overflow-y-auto">
-      {/* 1. Compact Scenario Stream Launcher Bar + Simulation Speed Control */}
+      {/* 1. Compact Scenario Stream Launcher Bar + Product Pill + Simulation Speed Control */}
       <div className="bg-white border border-[#DCE4EE] rounded-xl px-3.5 py-2 shadow-enterprise space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
             <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-[#ECF5FC] text-[#0E5A8A] border border-[#C2DFF3] uppercase tracking-wider whitespace-nowrap shrink-0">
-              Live Telemetry Streamer
+              Live Demand Scenarios
             </span>
             <h1 className="font-serif text-xs sm:text-[13px] font-bold text-[#14213D] truncate">
-              Stream Live Store Data (Firestore &rarr; BigQuery) &amp; Trigger Vertex AI Multi-Agent System
+              Start a Live Store Demand Stream to Trigger NexusTwin AI Multi-Agent System
             </h1>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#EEFBF6] text-[#095C47] border border-[#B8EAD8] whitespace-nowrap shrink-0">
+              <Package className="h-3 w-3 text-[#0D7A5F]" />
+              <span>HydroBoost Electrolyte 12-Pack</span>
+              <span className="font-mono text-[9px] opacity-80">(SKU-4089-HYDRATE)</span>
+            </span>
           </div>
 
           {/* Stream Speed Control + Reset Hint */}
@@ -567,35 +572,38 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({
         <div className="xl:col-span-7 xl:self-start bg-white border border-[#DCE4EE] rounded-2xl p-4 shadow-enterprise flex flex-col justify-start space-y-3.5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#DCE4EE] pb-2.5">
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h2 className="font-serif text-sm font-bold text-[#14213D]">
                   Live 3-Tier Supply Chain Network Map (Factory &rarr; Warehouses &rarr; Retail Shops)
                 </h2>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-[#ECF5FC] text-[#094266] border border-[#C2DFF3]">
+                  HydroBoost Electrolyte 12-Pack
+                </span>
                 {(dbMeta.firestore || dbMeta.bigquery) && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-[#EEFBF6] text-[#095C47] border border-[#B8EAD8]">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#0D7A5F]" />
-                    Live DB Synced
+                    Live Inventory Synced
                   </span>
                 )}
               </div>
               <p className="text-[11px] text-[#526582]">
                 {phase === 'IDLE'
-                  ? 'All stock numbers loaded live from Firestore & BigQuery. Click any shop/warehouse to inspect live DB stock, or run a stream above.'
-                  : `Active Stream on ${getNodeDisplayName(activeScenarioStoreId)} • Phase: ${phase.replace(/_/g, ' ')}`}
+                  ? 'Monitoring HydroBoost Electrolyte 12-Pack ($14.99 Retail) across 1 Factory, 3 Warehouses & 6 Retail Shops. Click any location to inspect stock.'
+                  : `Active Stream on ${getNodeDisplayName(activeScenarioStoreId)} • HydroBoost Electrolyte 12-Pack`}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-3 text-[11px] font-semibold">
               <span className="flex items-center space-x-1.5 text-[#095C47]">
                 <span className="h-2.5 w-2.5 rounded-full bg-[#0D7A5F] inline-block" />
-                <span>Retail STO</span>
+                <span>Warehouse Transfer</span>
               </span>
               <span className="flex items-center space-x-1.5 text-[#925802]">
                 <span className="h-2.5 w-2.5 rounded-full bg-[#C27803] inline-block" />
-                <span>B2B FMCG PO</span>
+                <span>Factory Purchase Order</span>
               </span>
               <span className="flex items-center space-x-1.5 text-[#9E2B1E]">
                 <span className="h-2.5 w-2.5 rounded-full bg-[#C93B2B] inline-block" />
-                <span>Spike Alert</span>
+                <span>Demand Spike</span>
               </span>
             </div>
           </div>
@@ -614,21 +622,21 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({
 
               {/* Swimlane Background Bands */}
               <rect x="8" y="6" width="904" height="98" rx="12" fill="#FFFBEB" fillOpacity="0.85" stroke="#FDE68A" strokeWidth="1" />
-              <rect x="16" y="12" width="320" height="20" rx="6" fill="#FEF3C7" stroke="#D97706" strokeWidth="1" />
+              <rect x="16" y="12" width="290" height="20" rx="6" fill="#FEF3C7" stroke="#D97706" strokeWidth="1" />
               <text x="26" y="25.5" className="text-[10px] font-bold fill-[#925802] uppercase tracking-wider">
-                TIER 1: FMCG MANUFACTURER (BIGQUERY FMCG ERP)
+                TIER 1: FMCG MANUFACTURER (BOTTLING PLANT)
               </text>
 
               <rect x="8" y="132" width="904" height="106" rx="12" fill="#ECF5FC" fillOpacity="0.85" stroke="#C2DFF3" strokeWidth="1" />
-              <rect x="16" y="138" width="322" height="20" rx="6" fill="#D6EAF8" stroke="#0E5A8A" strokeWidth="1" />
+              <rect x="16" y="138" width="276" height="20" rx="6" fill="#D6EAF8" stroke="#0E5A8A" strokeWidth="1" />
               <text x="26" y="151.5" className="text-[10px] font-bold fill-[#094266] uppercase tracking-wider">
-                TIER 2: RETAIL WAREHOUSES (BIGQUERY RETAIL ERP)
+                TIER 2: RETAIL REGIONAL WAREHOUSES (3 DCs)
               </text>
 
               <rect x="8" y="268" width="904" height="140" rx="12" fill="#EBF1F8" fillOpacity="0.7" stroke="#DCE4EE" strokeWidth="1" />
-              <rect x="16" y="274" width="318" height="20" rx="6" fill="#DCE4EE" stroke="#9BB0C9" strokeWidth="1" />
+              <rect x="16" y="274" width="256" height="20" rx="6" fill="#DCE4EE" stroke="#9BB0C9" strokeWidth="1" />
               <text x="26" y="287.5" className="text-[10px] font-bold fill-[#14213D] uppercase tracking-wider">
-                TIER 3: RETAIL SHOPS (FIRESTORE LIVE SHELF)
+                TIER 3: RETAIL STORES (6 TEXAS SHOPS)
               </text>
 
               {/* Connections: Factory -> 3 Warehouses */}
@@ -847,11 +855,11 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({
                       </text>
                     ) : isCompleted && isActiveSpikeStore && isPendingApproval ? (
                       <text x="67" y="71" textAnchor="middle" className="text-[9px] font-bold fill-[#C27803]">
-                        ⏳ In VP A2A Queue
+                        ⏳ In VP Queue
                       </text>
                     ) : (
                       <text x="67" y="71" textAnchor="middle" className="text-[8.5px] fill-[#526582]">
-                        Click to inspect DB
+                        Click to inspect
                       </text>
                     )}
                   </g>
@@ -860,20 +868,23 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({
             </svg>
           </div>
 
-          {/* Bottom of Left Column: Live DB Inspector for Selected Node (Identical Canonical Name!) */}
+          {/* Bottom of Left Column: Live Stock Inspector for Selected Node (Identical Canonical Name + Hero Product!) */}
           <div className="bg-[#F5F8FC] border border-[#DCE4EE] rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="space-y-1">
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Package className="h-4 w-4 text-[#0E5A8A]" />
                 <span className="text-xs font-bold text-[#14213D]">
-                  Live DB Stock — {focusedNodeDisplay}
+                  Live Stock — {focusedNodeDisplay}
                 </span>
-                <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-white border border-[#DCE4EE] text-[#0E5A8A]">
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-white border border-[#DCE4EE] text-[#094266]">
+                  HydroBoost Electrolyte 12-Pack
+                </span>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#ECF5FC] border border-[#C2DFF3] text-[#0E5A8A]">
                   {focusedNodeId.startsWith('STORE-')
-                    ? 'Firestore: store_live_shelf'
+                    ? 'Retail Store Shelf'
                     : focusedNodeId.startsWith('FMCG-')
-                    ? 'BigQuery: fmcg_factory_inventory'
-                    : 'BigQuery: retail_erp_inventory'}
+                    ? 'FMCG Bottling Factory'
+                    : 'Retail Regional Warehouse'}
                 </span>
               </div>
               {focusedNodeId.startsWith('STORE-') ? (
@@ -933,18 +944,16 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({
                 <Cpu className="h-4 w-4" />
               </div>
               <div className="min-w-0">
-                <div className="flex items-center gap-1.5">
+                <div className="flex flex-wrap items-center gap-1.5">
                   <h2 className="font-serif text-sm font-bold text-[#14213D] truncate">
                     NexusTwin AI Multi-Agent &amp; 4-Gate Execution
                   </h2>
-                  {lastDecision?.remote_executed && (
-                    <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-[#EEFBF6] text-[#095C47] border border-[#B8EAD8] shrink-0">
-                      Live Agent Engine
-                    </span>
-                  )}
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#EEFBF6] text-[#095C47] border border-[#B8EAD8] shrink-0">
+                    HydroBoost 12-Pack
+                  </span>
                 </div>
                 <p className="text-[11px] text-[#526582] truncate">
-                  Live Stream &rarr; Spike Trigger &rarr; MCP Agents &rarr; 4-Gate Guardrail &rarr; ERP / A2A
+                  Live Demand Stream &rarr; Spike Detection &rarr; Multi-Agent Planning &rarr; 4 Safety Checks &rarr; Action
                 </p>
               </div>
             </div>
@@ -955,7 +964,7 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({
                 className="flex items-center space-x-1 text-[11px] font-semibold bg-[#F5F8FC] hover:bg-[#ECF5FC] text-[#0E5A8A] border border-[#DCE4EE] px-2.5 py-1 rounded-lg transition cursor-pointer shrink-0"
               >
                 <FileJson className="h-3.5 w-3.5" />
-                <span>{showCommonJson ? 'Hide JSON' : 'Real JSON'}</span>
+                <span>{showCommonJson ? 'Hide JSON' : 'View JSON'}</span>
               </button>
             )}
           </div>
@@ -1145,21 +1154,21 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({
               </div>
               <div className="space-y-1 max-w-sm">
                 <h3 className="font-serif text-sm font-bold text-[#14213D]">
-                  Control Tower Standby — Live DB Connected
+                  Control Tower Standby — Monitoring HydroBoost Electrolyte 12-Pack
                 </h3>
                 <p className="text-xs text-[#3B4E6B] leading-relaxed">
                   Choose a streaming speed (<strong>0.5x / 1x / 2x</strong>) and start any of the{' '}
-                  <strong>4 Scenario Streams</strong> above to watch live sales decrement Firestore stock and trigger the Vertex AI Multi-Agent Swarm.
+                  <strong>4 Live Demand Scenarios</strong> above to watch store sales stream live and automatically trigger the Multi-Agent System.
                 </p>
               </div>
               <div className="w-full max-w-md bg-white border border-[#DCE4EE] rounded-xl p-3 text-left text-[11px] text-[#3B4E6B] space-y-1.5">
                 <div className="font-bold text-[#14213D] uppercase tracking-wider text-[10px]">
-                  Zero-Trust Retail ↔ FMCG Execution Flow:
+                  Autonomous Retail &harr; FMCG Replenishment Workflow:
                 </div>
-                <div>1. <strong>Live Telemetry Stream:</strong> Decrements real Firestore shelf stock &amp; syncs BigQuery Retail ERP on spike breach.</div>
-                <div>2. <strong>3 MCP Agents:</strong> Query <code>bigquery-telemetry-mcp</code>, <code>erp-inventory-mcp</code> (isolated Retail vs FMCG tables), &amp; <code>logistics-rates-mcp</code>.</div>
-                <div>3. <strong>In-Loop 4-Gate Guardrail:</strong> Verifies ATP, Delivery SLA, Margin ROI &amp; $1,000 B2B Cap <em>before</em> execution.</div>
-                <div>4. <strong>ERP STO / Cloud Run Remote A2A:</strong> Auto-executes &le; $1k STO, or pauses &gt; $1k FMCG PO via <code>approval_agent</code> until VP resumes in Tab 5.</div>
+                <div>1. <strong>Live Demand Stream:</strong> Tracks real-time store sales, 25-day weather forecasts &amp; local events for <strong>HydroBoost Electrolyte 12-Pack</strong>.</div>
+                <div>2. <strong>3 Specialist AI Agents:</strong> Verify demand spike, check Retail Warehouse / FMCG Factory availability, and quote optimal freight carriers.</div>
+                <div>3. <strong>4 Mandatory Safety Checks:</strong> Verify spare stock, delivery speed, profit ROI &amp; the $1,000 approval limit <em>before</em> dispatching.</div>
+                <div>4. <strong>Smart Execution:</strong> Auto-dispatches warehouse transfers (&le; $1,000) or pauses Factory Purchase Orders (&gt; $1,000) for 1-click VP sign-off in Tab 5.</div>
               </div>
             </div>
           )}
@@ -1187,11 +1196,11 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({
                       1
                     </span>
                     <span className="text-xs font-bold text-[#14213D] truncate">
-                      Market Sensing (<code className="text-[#0E5A8A] font-mono">{sensingOut.agent_name}</code>)
+                      Market Sensing Agent
                     </span>
                   </div>
                   <span className="text-[10px] font-bold bg-[#ECF5FC] text-[#0E5A8A] border border-[#C2DFF3] px-2 py-0.5 rounded-full shrink-0">
-                    bigquery-telemetry-mcp
+                    Demand &amp; Weather Signals
                   </span>
                 </div>
                 <div className="mt-1.5 pl-7 space-y-1 text-[11px]">
@@ -1202,14 +1211,14 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({
                       <strong className="text-[#C93B2B]">{sensingOut.velocity_spike_ratio}x</strong>
                     </span>
                     <span className="text-[#C93B2B] font-bold">
-                      DB Shelf: {sensingOut.current_shelf_stock} packs (Res: {sensingOut.safety_buffer})
+                      Shelf: {sensingOut.current_shelf_stock} packs (Reserve: {sensingOut.safety_buffer})
                     </span>
                   </div>
                   <p className="text-[11px] text-[#3B4E6B] leading-snug">{sensingOut.finding_summary}</p>
                 </div>
               </div>
 
-              {/* AGENT 2 OUTPUT: Stock & Replenishment Agent (Retail ERP + Isolated FMCG B2B) */}
+              {/* AGENT 2 OUTPUT: Stock & Replenishment Agent */}
               <div
                 className={`rounded-xl border p-3 ${
                   isFactoryPO ? 'bg-[#FFFBEB] border-[#FDE68A]' : 'bg-[#F5F8FC] border-[#DCE4EE]'
@@ -1221,7 +1230,7 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({
                       2
                     </span>
                     <span className="text-xs font-bold text-[#14213D] truncate">
-                      Replenishment (<code className="text-[#0E5A8A] font-mono">{repOut.agent_name}</code>)
+                      Stock &amp; Replenishment Agent
                     </span>
                   </div>
                   <span
@@ -1231,7 +1240,7 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({
                         : 'bg-[#EEFBF6] text-[#095C47] border-[#B8EAD8]'
                     }`}
                   >
-                    {isFactoryPO ? 'Retail ERP -> FMCG B2B MCP' : 'Retail ERP BigQuery MCP'}
+                    {isFactoryPO ? 'Warehouse Shortage -> Factory Order' : 'Regional Warehouse Stock'}
                   </span>
                 </div>
                 <div className="mt-1.5 pl-7 space-y-1 text-[11px]">
@@ -1254,7 +1263,7 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({
                       3
                     </span>
                     <span className="text-xs font-bold text-[#14213D] truncate">
-                      Logistics (<code className="text-[#0E5A8A] font-mono">{logOut.agent_name}</code>)
+                      Carrier &amp; Logistics Agent
                     </span>
                   </div>
                   <span className="text-[10px] font-mono font-bold bg-[#EBF1F8] text-[#14213D] border border-[#DCE4EE] px-2 py-0.5 rounded-full shrink-0">
@@ -1265,13 +1274,13 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({
                   <div>{logOut.finding_summary}</div>
                   {logOut.carrier_negotiation_summary && (
                     <div className="text-[10px] text-[#095C47] bg-[#EEFBF6] px-2 py-1 rounded border border-[#B8EAD8] font-medium">
-                      🚚 <strong>3PL Carrier Selection:</strong> {logOut.carrier_negotiation_summary}
+                      🚚 <strong>Carrier Selection:</strong> {logOut.carrier_negotiation_summary}
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* STAGE 4: IN-LOOP DETERMINISTIC 4-GATE GUARDRAIL */}
+              {/* STAGE 4: 4 MANDATORY BUSINESS & SAFETY CHECKS */}
               {hasGateChecked && (
                 <div className="rounded-xl border border-[#C2DFF3] bg-[#ECF5FC]/70 p-3">
                   <div className="flex items-center justify-between gap-2 mb-2">
@@ -1281,7 +1290,7 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({
                       </span>
                       <span className="text-xs font-bold text-[#14213D] flex items-center gap-1 truncate">
                         <Calculator className="h-3.5 w-3.5 text-[#0E5A8A] shrink-0" />
-                        <span className="truncate">4-Gate Mathematical Guardrail (Verified Pre-Action)</span>
+                        <span className="truncate">4 Mandatory Business &amp; Safety Checks</span>
                       </span>
                     </div>
                     <span
@@ -1291,17 +1300,17 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({
                           : 'bg-[#EEFBF6] text-[#095C47] border-[#B8EAD8]'
                       }`}
                     >
-                      {isPendingApproval ? 'GATES 1-3 PASS • GATE 4 VP PAUSE' : 'ALL 4 GATES PASSED'}
+                      {isPendingApproval ? 'CHECKS 1-3 PASS • CHECK 4 VP SIGN-OFF' : 'ALL 4 CHECKS PASSED'}
                     </span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px]">
                     {(gateEval.rules_evaluated || []).map((rule: any, idx: number) => {
                       const shortTitles = [
-                        '1. ATP Integrity',
-                        '2. Delivery SLA',
-                        '3. Margin ROI',
-                        '4. $1k / B2B Authority',
+                        '1. Spare Stock Check',
+                        '2. Delivery Speed SLA',
+                        '3. Profit Margin ROI',
+                        '4. $1,000 Approval Cap',
                       ];
                       const isGate4ApprovedLater = idx === 3 && !isPendingApproval && lastDecision?.gate_status === 'APPROVED';
                       const passedDisplay = rule.passed || isGate4ApprovedLater;
@@ -1319,7 +1328,7 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({
                                 passedDisplay ? 'bg-[#EEFBF6] text-[#0D7A5F]' : 'bg-[#FEF3C7] text-[#925802]'
                               }`}
                             >
-                              {passedDisplay ? 'PASS ✓' : 'A2A PAUSE ⏳'}
+                              {passedDisplay ? 'PASS ✓' : 'VP QUEUE ⏳'}
                             </span>
                           </div>
                           <div className="font-mono text-[10px] text-[#3B4E6B] mt-0.5">
@@ -1332,7 +1341,7 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({
                 </div>
               )}
 
-              {/* STAGE 5: FINAL VERIFIED ERP EXECUTION OR REMOTE A2A WAITING RESPONSE */}
+              {/* STAGE 5: FINAL VERIFIED EXECUTION OR VP APPROVAL QUEUE */}
               {isCompleted && (
                 <div
                   className={`rounded-xl border p-3.5 ${
@@ -1350,10 +1359,10 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({
                       </span>
                       <span className="text-xs font-bold text-[#14213D] truncate">
                         {isPendingApproval
-                          ? 'Remote A2A Agent Paused (State: input-required)'
+                          ? 'Paused for Retail VP Approval (Exceeds $1,000 Cap)'
                           : isFactoryPO
-                          ? 'VP Resumed A2A Session -> B2B FMCG PO Dispatched'
-                          : 'Autonomous SAP STO Executed via ERP MCP'}
+                          ? 'VP Approved — Factory Purchase Order Dispatched'
+                          : 'Warehouse Stock Transfer Dispatched Automatically'}
                       </span>
                     </div>
                     <span
@@ -1371,7 +1380,7 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({
 
                   {isPendingApproval && lastDecision?.a2a_agent_response && (
                     <div className="mt-2 ml-7 p-2 bg-white/90 border border-[#FDE68A] rounded-lg text-[11px] text-[#925802] leading-snug">
-                      <strong>Remote A2A Response:</strong> {lastDecision.a2a_agent_response}
+                      <strong>Approval Queue Status:</strong> {lastDecision.a2a_agent_response}
                     </div>
                   )}
 
@@ -1382,14 +1391,14 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({
                         className="flex items-center space-x-1.5 bg-[#C27803] hover:bg-[#925802] text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs transition cursor-pointer"
                       >
                         <ShieldAlert className="h-4 w-4" />
-                        <span>Open Tab 5: Approve &amp; Resume A2A (${totalCommitment.toLocaleString()})</span>
+                        <span>Open Tab 5: Approve Factory Order (${totalCommitment.toLocaleString()})</span>
                         <ArrowRight className="h-3.5 w-3.5" />
                       </button>
                     ) : (
                       <div className="flex items-center space-x-1.5 text-[11px] font-bold text-[#095C47]">
                         <CheckCircle2 className="h-4 w-4 text-[#0D7A5F] shrink-0" />
                         <span>
-                          BigQuery ERP &amp; Firestore Updated • Net Profit: +${netProfitProtected.toLocaleString()}
+                          Inventory Updated • Net Profit Protected: +${netProfitProtected.toLocaleString()}
                         </span>
                       </div>
                     )}
@@ -1399,7 +1408,7 @@ export const DigitalTwinMap: React.FC<DigitalTwinMapProps> = ({
                       className="text-[11px] font-semibold text-[#0E5A8A] hover:text-[#094266] flex items-center space-x-1 cursor-pointer"
                     >
                       <Sparkles className="h-3 w-3" />
-                      <span>{showRawTrace ? 'Hide Live Agent Trace' : 'View Live Agent Trace'}</span>
+                      <span>{showRawTrace ? 'Hide Technical Trace' : 'View Technical Trace'}</span>
                       {showRawTrace ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                     </button>
                   </div>

@@ -144,21 +144,21 @@ def _extract_json_block(text: str) -> Optional[Dict[str, Any]]:
 
 
 def _map_agent_stage(author: str, tool_names: List[str]) -> Dict[str, str]:
-    """Map ADK author / MCP tool names into a clean UI pipeline stage ID and human label."""
+    """Map ADK author / MCP tool names into a clean UI pipeline stage ID and end-user friendly status label."""
     joined = " ".join([author or ""] + (tool_names or [])).lower()
     if "approval_agent" in joined or "ask_for_approval" in joined or "create_fmcg_purchase_order" in joined:
-        return {"stage": "execution_a2a", "label": "Remote A2A Approval Agent (Cloud Run)"}
+        return {"stage": "execution_a2a", "label": "Routing high-value factory order to VP Approval Queue..."}
     if "create_transfer_order" in joined:
-        return {"stage": "execution_a2a", "label": "SAP ERP MCP -> Executing Internal STO"}
+        return {"stage": "execution_a2a", "label": "Dispatching autonomous warehouse stock transfer order..."}
     if "evaluate_4_gate" in joined or "guardrail" in joined:
-        return {"stage": "gate_guardrail", "label": "In-Loop 4-Gate Mathematical Guardrail"}
+        return {"stage": "gate_guardrail", "label": "Verifying 4 mandatory business & safety checks..."}
     if "logistics" in joined or "freight" in joined or "carrier" in joined:
-        return {"stage": "logistics", "label": "Logistics Agent -> 3PL Carrier Rates MCP"}
+        return {"stage": "logistics", "label": "Logistics Agent comparing carrier quotes & transit times..."}
     if "replenishment" in joined or "available_to_promise" in joined or "fmcg_manufacturer" in joined or "warehouse_stock" in joined:
-        return {"stage": "replenishment", "label": "Replenishment Agent -> Retail/FMCG ERP MCP"}
+        return {"stage": "replenishment", "label": "Replenishment Agent checking warehouse & factory stock..."}
     if "sensing" in joined or "scanner" in joined or "weather" in joined or "social" in joined:
-        return {"stage": "sensing", "label": "Market Sensing Agent -> BigQuery Telemetry MCP"}
-    return {"stage": "supervisor", "label": f"Supervisor ({author or 'twin_supervisor'})"}
+        return {"stage": "sensing", "label": "Market Sensing Agent analyzing live demand & forecast..."}
+    return {"stage": "supervisor", "label": "Multi-Agent Supervisor coordinating replenishment plan..."}
 
 
 class DigitalTwinService:
@@ -507,9 +507,9 @@ class DigitalTwinService:
 
         spike_ratio = round(final_velocity / max(baseline_vel, 1.0), 2)
         alert_msg = (
-            f"SPIKE THRESHOLD BREACHED — {store_display}: Demand reached {final_velocity:.0f} packs/hr "
-            f"({spike_ratio}x baseline) with {final_on_hand} packs live on shelf in DB. "
-            f"Invoking Vertex AI Agent Engine Multi-Agent Swarm..."
+            f"Demand Spike Detected at {store_display}: HydroBoost 12-Pack demand reached "
+            f"{final_velocity:.0f} packs/hr ({spike_ratio}x normal) with {final_on_hand} packs on shelf. "
+            f"Triggering Multi-Agent System..."
         )
         if broadcast_fn:
             await broadcast_fn({
@@ -545,7 +545,7 @@ class DigitalTwinService:
             context_notes=payload.get("context_notes"),
         )
 
-        # Neutral, non-leading prompt: gives ONLY the trigger alert so the agents MUST query live MCPs!
+        # Concise, non-leading event payload — the common 6-step workflow lives in `twin_supervisor`'s instruction!
         serving_dc = STORE_SERVING_DC.get(store_id, "DC-ATX-02")
         req_units = int(payload.get("requested_units_override") or 1500)
         urgency_hint = (
@@ -554,17 +554,9 @@ class DigitalTwinService:
         )
         live_prompt = (
             f"LIVE TELEMETRY SPIKE ALERT — Event `{event.event_id}` ({signal_source}) at "
-            f"`{store_id}` ({store_display}) for `{sku_id}`. Requested replenishment quantity: {req_units} packs. "
-            f"Serving regional warehouse is `{serving_dc}`. Urgency hint: `{urgency_hint}`.\n"
-            f"Execute your strict 6-step workflow using ONLY live MCP servers:\n"
-            f"1) Call `market_sensing_agent` to verify the live shelf stock, velocity, and weather/social context via `bigquery-telemetry-mcp`.\n"
-            f"2) Call `replenishment_agent` to check live Retail DC ATP at `{serving_dc}` via `erp-inventory-mcp` "
-            f"(and if ATP < {req_units}, cross the B2B boundary to check `FMCG-PLANT-TX01` capacity).\n"
-            f"3) Call `logistics_agent` to quote 3PL carriers via `logistics-rates-mcp`.\n"
-            f"4) Call `evaluate_4_gate_guardrail` with the EXACT numeric values returned by Steps 1-3.\n"
-            f"5) Follow `evaluate_4_gate_guardrail.decision` strictly: if `AUTO_EXECUTE_STO`, call `create_transfer_order` "
-            f"on `erp-inventory-mcp`; if `ESCALATE_TO_VP_A2A`, transfer to `approval_agent` (RemoteA2aAgent) — NEVER execute an FMCG PO without a VP token.\n"
-            f"6) Output the fenced ```json ... ``` structured summary block with all exact real values."
+            f"`{store_id}` ({store_display}) for `{sku_id}` (HydroBoost Electrolyte 12-Pack). "
+            f"Requested replenishment quantity: {req_units} packs. "
+            f"Serving regional warehouse: `{serving_dc}`. Urgency hint: `{urgency_hint}`."
         )
 
         return await self.ingest_market_signal(
@@ -828,8 +820,8 @@ class DigitalTwinService:
             a2a_ticket_id=ticket_id,
             a2a_task_state=a2a_task_state,
             a2a_agent_response=a2a_resp.get("message") or (
-                f"Remote A2A Agent (`approval_agent`) paused session {remote_res.get('vertex_session_id')} "
-                f"with ticket {ticket_id} (state: input-required). Gates 1-3 passed; awaiting Retail VP sign-off in Tab 5."
+                f"Approval Request #{ticket_id} created: All 3 business & safety checks passed (Stock, Delivery SLA, Profit ROI). "
+                f"Waiting for Retail VP sign-off in Tab 5 before dispatching Factory Purchase Order."
                 if gate_res.gate_status == GateStatus.REFERRED_TO_HUMAN
                 else None
             ),
@@ -866,13 +858,13 @@ class DigitalTwinService:
                 "event_id": event.event_id,
                 "scenario_key": scenario_key,
                 "active_agent": "twin_supervisor",
-                "status_message": f"Vertex AI Agent Engine Swarm Active for {get_node_display_name(event.store_id)}...",
+                "status_message": f"Triggering Multi-Agent System for {get_node_display_name(event.store_id)}...",
             })
 
         prompt = custom_prompt or (
             f"LIVE TELEMETRY SPIKE ALERT — Event `{event.event_id}` ({event.signal_source}) at "
-            f"`{event.store_id}` ({get_node_display_name(event.store_id)}) for `{event.sku_id}`. "
-            f"Run your 6-step workflow via live MCP tools and return the fenced ```json ... ``` summary."
+            f"`{event.store_id}` ({get_node_display_name(event.store_id)}) for `{event.sku_id}` "
+            f"(HydroBoost Electrolyte 12-Pack)."
         )
 
         # 1. Invoke deployed Vertex AI Agent Engine (streaming real ADK & MCP step events live to UI!)

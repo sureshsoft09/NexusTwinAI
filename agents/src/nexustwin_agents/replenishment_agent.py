@@ -22,9 +22,13 @@ except ImportError:
 
 try:
     from google.adk.agents import LlmAgent
+    from google.genai import types
+    _REPL_GEN_CFG = types.GenerateContentConfig(temperature=0.1, max_output_tokens=512)
 except ImportError:
+    _REPL_GEN_CFG = None
+
     class LlmAgent:
-        def __init__(self, name: str, instruction: str, model: str = "gemini-3.5-flash", tools: list = None, **kwargs):
+        def __init__(self, name: str, instruction: str, model: str = "gemini-3.5-flash-lite", tools: list = None, **kwargs):
             self.name = name
             self.instruction = instruction
             self.model = model
@@ -32,39 +36,33 @@ except ImportError:
 
 
 REPLENISHMENT_INSTRUCTION = """
-You are the NexusTwin Autonomous Replenishment & B2B Supplier Planner (`replenishment_agent`).
-You MUST query real live ERP data through the `erp-inventory-mcp` MCP tools — never invent numbers!
+You are `replenishment_agent`. Use ONLY live `erp-inventory-mcp` read tools; never invent numbers.
 
-Serving Warehouse Mapping:
-  - `STORE-DAL-04` (Shop 1: Dallas), `STORE-PLANO-07` (Shop 3: Plano), `STORE-FW-02` (Shop 5: Fort Worth) -> `DC-ATX-02`
-  - `STORE-HOU-05` (Shop 2: Houston) -> `DC-HOU-01`
-  - `STORE-ARL-11` (Shop 4: Arlington), `STORE-SAT-06` (Shop 6: San Antonio) -> `DC-SAT-03`
+Serving Warehouse Map:
+- `STORE-DAL-04`, `STORE-PLANO-07`, `STORE-FW-02` -> `DC-ATX-02`
+- `STORE-HOU-05` -> `DC-HOU-01`
+- `STORE-ARL-11`, `STORE-SAT-06` -> `DC-SAT-03`
 
-Workflow:
-1. Call `get_dc_available_to_promise(sku, dc_id, requested_units)` on the store's serving Regional Warehouse.
-2. Check whether `can_fulfill_from_dc` is True:
-   - If TRUE: Recommend `order_type = "STO_FROM_DC"` from `serving_dc_id` (`merchandise_cost_usd = 0.0`).
-     Do NOT contact the FMCG Manufacturer when the Retailer's own DC has sufficient ATP!
-   - If FALSE (e.g., `DC-HOU-01` only has 180 ATP < 1,800 needed):
-     Cross the B2B boundary by calling `check_fmcg_manufacturer_capacity(sku, requested_units, fmcg_vendor_id="FMCG-PLANT-TX01")`
-     to inspect the isolated FMCG Manufacturer ERP (`fmcg_factory_inventory`) and lock in the $8.79/pack contract wholesale tier.
-     Recommend `order_type = "PO_TO_FMCG"` from `FMCG-PLANT-TX01`.
-3. IMPORTANT: Do NOT call `create_transfer_order` or `create_fmcg_purchase_order` in this planning step —
-   order execution is controlled strictly by `twin_supervisor` AFTER the 4-Gate Guardrail passes!
-4. Report ALL exact numeric values returned by the MCP tools:
-   - `serving_dc_id`, `serving_dc_on_hand`, `serving_dc_safety_buffer`, `serving_dc_atp_surplus`
-   - `requested_units`, `serving_dc_has_stock`, `escalated_to_fmcg`
-   - `selected_source_node`, `selected_source_atp_surplus`, `order_type`
-   - `protected_margin_usd` (`requested_units * 6.20`), `merchandise_cost_usd`
-   - `supplier_negotiation_summary` and `mcp_tools_called`.
+STRICT MINIMAL-CALL RULES (NEVER repeat calls or probe extra DCs):
+1. Call `get_dc_available_to_promise(sku, dc_id, requested_units)` ONCE on the store's serving DC.
+2. If `can_fulfill_from_dc` is True: STOP tool calls immediately. Recommend `order_type="STO_FROM_DC"` from `serving_dc_id` (`merchandise_cost_usd=0.0`). Do NOT query `FMCG-PLANT-TX01` or any other DC.
+3. ONLY if `can_fulfill_from_dc` is False: call `check_fmcg_manufacturer_capacity(sku, requested_units, fmcg_vendor_id="FMCG-PLANT-TX01")` ONCE to lock in the $8.79/pack contract tier and recommend `order_type="PO_TO_FMCG"` from `FMCG-PLANT-TX01`.
+4. NEVER call `create_transfer_order` or `create_fmcg_purchase_order` (execution happens only after the 4-Gate Guardrail).
+5. Return ONLY a concise JSON object (no essay) with exact MCP values:
+   `serving_dc_id`, `serving_dc_on_hand`, `serving_dc_safety_buffer`, `serving_dc_atp_surplus`,
+   `requested_units`, `serving_dc_has_stock`, `escalated_to_fmcg`, `selected_source_node`,
+   `selected_source_atp_surplus`, `order_type`, `protected_margin_usd` (`requested_units * 6.20`),
+   `merchandise_cost_usd`, `mcp_tools_called`, and 1-sentence `supplier_negotiation_summary` + `finding_summary`.
 """
 
 replenishment_agent = LlmAgent(
-    model=config.get_gemini_model(config.MODEL_REASONING),
+    model=config.get_gemini_model(config.MODEL_FAST),
     name="replenishment_agent",
     description="Queries live erp-inventory-mcp for Retail DC ATP (BigQuery retail_erp_inventory) and escalates across the B2B boundary to FMCG Manufacturer capacity (fmcg_factory_inventory) if DC ATP is short.",
     instruction=REPLENISHMENT_INSTRUCTION,
     tools=[ErpMCP_Tool],
+    before_model_callback=config.before_model_guard,
+    generate_content_config=_REPL_GEN_CFG,
 )
 
 replenishment_investigate = replenishment_agent
